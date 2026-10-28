@@ -46,6 +46,8 @@ except (EnvironmentError, ValueError) as e:
 # Base directory for the application (where the app is running)
 BASE_DIR = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+MODELS_DIR = os.path.join(BASE_DIR.parent, "models")
+
 # Directory for storing uploaded files and their processed output
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
 PDF_DIR = os.path.join(UPLOAD_DIR, "pdfs")

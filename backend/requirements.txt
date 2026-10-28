@@ -12,8 +12,8 @@ openai==1.65.3
 IPython==8.33.0
 pystow==0.7.0
 slowapi
-websockets==15.0.0
-jinja2==3.1.5
+websockets>=15.0.0
+jinja2>=3.1.5
 numba
 PyMuPDF
 
@@ -29,31 +29,36 @@ pytest-asyncio>=1.1.0
 
 # ML/DL Frameworks
 # Note: PyTorch and TorchVision are installed separately with CUDA support
-pytorch-lightning==2.2.5
+#pytorch-lightning==2.2.5
 six==1.17.0
 albumentations==1.1.0
 SmilesPE==0.0.3
-timm==0.4.12
-pyonmttok==1.37.1
+timm
+#pyonmttok==1.37.1
 OpenNMT-py==2.2.0
-tensorflow[and-cuda]==2.15.1
-Keras-Preprocessing==1.1.2
-efficientnet==1.1.1
-transformers==4.49.0
+#tensorflow[and-cuda]==2.15.1
+#tensorflow==2.16.2
+#Keras-Preprocessing==1.1.2
+efficientnet>=1.1.1
+transformers>=4.49.0
 huggingface-hub>=0.11.0
-tensorboardX
-scipy==1.13.1
+#tensorboardX
+scipy
 
 # Image processing
 opencv-python
 pillow
-pillow-heif==0.21.0
-scikit-image==0.24.0
-matplotlib==3.9.0
-pandas==2.2.3
+pillow-heif
+scikit-image
+matplotlib
+pandas
 
 # Chemistry-specific
 jpype1==1.5.2
 selfies==2.2.0
-unicodedata2==15.0.0
-rdkit==2024.9.5
+#unicodedata2==15.0.0
+rdkit
+
+# others
+#docling
+ultralytics

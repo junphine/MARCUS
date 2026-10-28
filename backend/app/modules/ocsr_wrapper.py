@@ -4,45 +4,28 @@ import torch
 from typing import Tuple, Dict, Union, Literal, Any
 from pathlib import Path
 from fastapi import HTTPException, status
-from DECIMER import predict_SMILES
-from MolNexTR import MolNexTRSingleton
+
 from MolNexTR import get_predictions as molnextr_get_predictions
 from molscribe import MolScribe
-from huggingface_hub import hf_hub_download
 from app.config import UPLOAD_DIR
 
 _molscribe_model = None
-
 
 # Create a directory for chemical structure images
 IMAGES_DIR = os.path.join(UPLOAD_DIR, "chem_images")
 os.makedirs(IMAGES_DIR, exist_ok=True)
 
 
-def get_decimer_prediction(
-    path: Union[str, Path], hand_drawn: bool = False
-) -> Tuple[str, str]:
-    """
-    Get SMILES prediction from DECIMER model for a given image path.
+def _get_recognizer():
+    from molscribe import MolScribe
+    from modelscope import snapshot_download
+    ckpt = snapshot_download(
+        repo_id="polyai/MolScribe",
+        allow_file_pattern="swin_base_char_aux_1m.pth",
+    )
+    _RECOGNIZER = MolScribe(ckpt, device=torch.device("cpu"))
 
-    Args:
-        path: Path to the chemical structure image.
-        hand_drawn: Flag indicating if the image contains a hand-drawn structure.
-
-    Returns:
-        A tuple containing (image_name, smiles_string)
-
-    Raises:
-        FileNotFoundError: If the specified path does not exist.
-    """
-    path = Path(path)
-    if not path.exists():
-        raise FileNotFoundError(f"Image file not found: {path}")
-
-    smiles = predict_SMILES(str(path), confidence=False, hand_drawn=hand_drawn)
-    image_name = path.name
-
-    return image_name, smiles
+    return _RECOGNIZER
 
 
 def get_molnextr_prediction(
@@ -121,7 +104,12 @@ def init_molscribe(ckpt_path=None):
         if MolScribe is None:
             raise ImportError("MolScribe is not installed")
 
+        _molscribe_model = _get_recognizer()
+        if _molscribe_model:
+            return _molscribe_model
+
         if ckpt_path is None:
+            from huggingface_hub import hf_hub_download
             ckpt_path = hf_hub_download("yujieq/MolScribe", "swin_base_char_aux_1m.pth")
 
         _molscribe_model = MolScribe(ckpt_path, device=torch.device("cpu"))
@@ -184,7 +172,7 @@ def get_molscribe_prediction(
 
 def get_smiles_ocsr(
     path: Union[str, Path],
-    engine: Literal["decimer", "molnextr", "molscribe"] = "decimer",
+    engine: Literal["decimer", "molnextr", "molscribe"] = "molscribe",
     coordinates: bool = False,
     hand_drawn: bool = False,
 ) -> Union[Tuple[str, str], Tuple[str, str, str]]:
@@ -221,9 +209,7 @@ def get_smiles_ocsr(
             "Coordinates are only available when using the 'molnextr' or 'molscribe' engines."
         )
 
-    if engine == "decimer":
-        return get_decimer_prediction(path, hand_drawn=hand_drawn)
-    elif engine == "molscribe":
+    if engine == "molscribe":
         data_type = "both" if coordinates else "smiles"
         return get_molscribe_prediction(path, data_type=data_type)
     else:  # engine == "molnextr"
@@ -278,7 +264,7 @@ def process_chemical_structure(
     try:
         # Import device info if available
         try:
-
+            from MolNexTR import MolNexTRSingleton
             device, device_name = MolNexTRSingleton.get_device()
             hardware_info = device_name
         except:
@@ -316,35 +302,6 @@ def process_chemical_structure(
                     "molfile": molfile,
                     "engine": engine,
                     "hardware": f"CPU (PyTorch)",
-                }
-
-        # Original DECIMER processing
-        elif engine == "decimer":
-            if output_type == "smiles":
-                image_name, smiles = get_decimer_prediction(
-                    file_path, hand_drawn=hand_drawn
-                )
-                return {
-                    "image_name": image_name,
-                    "smiles": smiles,
-                    "engine": engine,
-                    "model": "hand_drawn" if hand_drawn else "standard",
-                    "hardware": hardware_info,
-                }
-            elif output_type == "molfile":
-                raise ValueError(
-                    "Molfile output is only available with the 'molnextr' and 'molscribe' engines"
-                )
-            else:  # output_type == "both"
-                image_name, smiles = get_decimer_prediction(
-                    file_path, hand_drawn=hand_drawn
-                )
-                return {
-                    "image_name": image_name,
-                    "smiles": smiles,
-                    "engine": engine,
-                    "model": "hand_drawn" if hand_drawn else "standard",
-                    "hardware": hardware_info,
                 }
 
         # Original MolNexTR processing

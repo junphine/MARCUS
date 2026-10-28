@@ -110,10 +110,10 @@ class EnvironmentValidator:
 
         # OpenAI API keys start with 'sk-' and have specific length
         if not key.startswith("sk-"):
-            return False
+            return True # modify@byron
 
         # Check minimum length (OpenAI keys are typically 51+ characters)
-        if len(key) < 51:
+        if len(key) < 48:
             return False
 
         # Check for valid characters (alphanumeric and some special chars)

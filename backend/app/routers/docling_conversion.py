@@ -1,5 +1,5 @@
 from __future__ import annotations
-import os
+import os,re
 import uuid
 import logging
 from PyPDF2 import PdfReader
@@ -100,7 +100,9 @@ async def extract_pdf_json(
         # Generate unique filename to prevent collisions
         unique_id = str(uuid.uuid4())[:8]
         original_filename = pdf_file.filename
-        filename_parts = os.path.splitext(original_filename)
+        safe_filename = re.sub(r"[^\w.-]", "_", original_filename)
+
+        filename_parts = os.path.splitext(safe_filename)
         safe_filename = f"{filename_parts[0]}_{unique_id}{filename_parts[1]}"
 
         # Create the full file path
@@ -157,7 +159,7 @@ async def extract_pdf_text(
     try:
         # Use original filename without adding unique IDs
         original_filename = pdf_file.filename
-        safe_filename = original_filename.replace(" ", "_")
+        safe_filename = re.sub(r"[^\w.-]", "_", original_filename)
 
         # Create the full file path
         file_path = os.path.join(PDF_DIR, safe_filename)

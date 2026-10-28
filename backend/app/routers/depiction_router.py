@@ -31,7 +31,7 @@ class DepictionRequest(BaseModel):
     molfile: Optional[str] = Field(None, description="Molfile string to depict")
     use_molfile_directly: Optional[bool] = Field(
         False,
-        alias="useMolfileDirectly",
+        alias="use_molfile_directly",
         description="Whether to use molfile directly with CDK without generating coordinates",
     )
     # Engine is ignored - always uses CDK
@@ -170,7 +170,7 @@ async def create_depiction(request: DepictionRequest):
 async def visualize_structure(
     smiles: Optional[str] = Form(None, description="SMILES string to depict"),
     molfile: Optional[str] = Form(None, description="Molfile string to depict"),
-    useMolfileDirectly: Optional[bool] = Form(
+    use_molfile_directly: Optional[bool] = Form(
         False,
         description="Whether to use molfile directly with CDK without generating coordinates",
     ),
@@ -227,7 +227,7 @@ async def visualize_structure(
             highlight=highlight,
             transparent=transparent,
             format=format,
-            use_molfile_directly=useMolfileDirectly,
+            use_molfile_directly=use_molfile_directly,
         )
 
         # Return response based on format

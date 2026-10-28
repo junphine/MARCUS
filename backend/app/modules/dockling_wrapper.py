@@ -10,11 +10,9 @@ from docling.document_converter import (
     ConversionResult,
 )
 from PyPDF2 import PdfReader, PdfWriter
-from app.config import PDF_DIR
+from app.config import PDF_DIR,MODELS_DIR
 
-artifacts_path = "/Users/kohulanrajan/.cache/docling/models"
-
-pipeline_options = PdfPipelineOptions(artifacts_path=artifacts_path)
+pipeline_options = PdfPipelineOptions(artifacts_path=MODELS_DIR)
 doc_converter = DocumentConverter(
     format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)}
 )
@@ -336,8 +334,7 @@ def get_converted_document(path, number_of_pages=2):
         dict_keys(['texts', 'schema_name', 'name', ...])
     """
     output_pdf_file_path = extract_first_three_pages(path, number_of_pages)
-    converter = DocumentConverter()
-    conv_result: ConversionResult = converter.convert(output_pdf_file_path)
+    conv_result: ConversionResult = doc_converter.convert(output_pdf_file_path)
     conv_result_dict = conv_result.document.export_to_dict()
     return conv_result_dict
 
@@ -731,7 +728,7 @@ async def extract_pdf_text(
             - 500: If PDF processing fails
 
     Example:
-        >>> result = await extract_pdf_text(pdf_file, pages=2)
+        >>> result = _await extract_pdf_text(pdf_file, pages=2)
         >>> print(result['text'][:100])
         "Title: Novel Chemical Analysis Abstract: This paper presents..."
     """

@@ -15,7 +15,7 @@ from fastapi.responses import FileResponse
 from app.schemas.healthcheck import HealthCheck
 from app.schemas.error import BadRequestModel, ErrorResponse, NotFoundModel
 from app.config import PDF_DIR, SEGMENTS_DIR
-from app.modules.decimer_segmentation_wrapper import (
+from app.modules.docling_segmentation_wrapper import (
     get_doi_from_file,
     get_complete_segments,
     segments_exist,
@@ -104,8 +104,10 @@ async def extract_doi(
         # Generate unique filename to prevent collisions
         unique_id = str(uuid.uuid4())[:8]
         original_filename = pdf_file.filename
+        # Replace spaces and special characters with underscores
+        safe_filename = re.sub(r"[^\w.-]", "_", original_filename)
         filename_parts = os.path.splitext(original_filename)
-        safe_filename = f"{filename_parts[0]}_{unique_id}{filename_parts[1]}"
+
 
         # Create the full file path
         file_path = os.path.join(PDF_DIR, safe_filename)

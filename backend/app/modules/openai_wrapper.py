@@ -23,11 +23,13 @@ except Exception as e:
     logger.error(f"OpenAI API key configuration failed: {e}")
     raise
 
-# Initialize OpenAI client with validated key
-client = OpenAI(api_key=api_key_manager.api_key)
-
-# Use environment variable for model ID or fall back to the existing value
+# Use environment variable for model ID or fall back to the existing
 OPENAI_MODEL_ID = os.environ.get("OPENAI_MODEL_ID", "gpt-4")
+# Use environment variable for model ID or fall back to the existing value
+OPENAI_BASE_URL = os.environ.get("OPENAI_BASE_URL", None)
+
+# Initialize OpenAI client with validated key
+client = OpenAI(api_key=api_key_manager.api_key,base_url=OPENAI_BASE_URL)
 
 try:
     retrieve_job_response = client.fine_tuning.jobs.retrieve(OPENAI_MODEL_ID)
