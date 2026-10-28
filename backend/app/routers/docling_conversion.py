@@ -16,7 +16,7 @@ from app.schemas.error import BadRequestModel, ErrorResponse, NotFoundModel
 from app.config import PDF_DIR
 from app.modules.dockling_wrapper import (
     get_converted_document,
-    extract_from_docling_document,
+    extract_pdf_text_with_headers,
     combine_to_paragraph,
 )
 from app.security.file_validator import validate_pdf_upload
@@ -157,37 +157,7 @@ async def extract_pdf_text(
         )
 
     try:
-        # Use original filename without adding unique IDs
-        original_filename = pdf_file.filename
-        safe_filename = re.sub(r"[^\w.-]", "_", original_filename)
-
-        # Create the full file path
-        file_path = os.path.join(PDF_DIR, safe_filename)
-
-        # Check if file already exists
-        if os.path.exists(file_path):
-            # Use existing file
-            pass
-        else:
-            # Save the uploaded file with original name
-            with open(file_path, "wb") as buffer:
-                content = await pdf_file.read()
-                buffer.write(content)
-
-        # Process the PDF file
-        json_data = get_converted_document(file_path, number_of_pages=pages)
-        result = extract_from_docling_document(json_data)
-        combined_text = combine_to_paragraph(result)
-
-        # Check if the extracted text has more than 10 words
-        word_count = len(combined_text.split())
-        if word_count <= 10:
-            reader = PdfReader(file_path)
-            if len(reader.pages) > 0:
-                first_page_text = reader.pages[0].extract_text()
-                combined_text = first_page_text.strip()
-
-        return {"text": combined_text, "pdf_filename": safe_filename}
+        return await extract_pdf_text_with_headers(pdf_file,pages)
 
     except Exception as e:
         raise HTTPException(

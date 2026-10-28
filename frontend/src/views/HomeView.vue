@@ -1859,8 +1859,8 @@ getStoredDOI() {
   gap: 0.6rem; /* Further reduced from 0.8rem to save more vertical space */
   max-width: 100%;
   padding: 0 0.5rem;
-  height: 100%;
-  overflow: hidden;
+  min-height: 100%; /* Allow page to grow beyond the viewport so it can scroll vertically */
+  overflow: visible;
 }
 
 .page-title {
@@ -1895,10 +1895,11 @@ getStoredDOI() {
 .columns-container {
   display: flex;
   gap: 0;
-  height: calc(100vh - 253px); /* Adjusted for reduced header height (was 260px, now 253px - saving 7px) */
+  min-height: calc(100vh - 253px); /* Adjusted for reduced header height (was 260px, now 253px - saving 7px) */
   width: 100%;
   position: relative;
-  overflow: hidden; /* Keep this as hidden to prevent horizontal scrolling */
+  overflow-x: hidden; /* Prevent horizontal scrolling from the column resizers */
+  overflow-y: visible; /* Let content grow so the page gets a vertical scrollbar */
   
   /* Add styles to make sure child components display correctly */
   :deep(.segments-panel) {
@@ -1954,7 +1955,7 @@ getStoredDOI() {
   position: relative;
   display: flex;
   flex-direction: column;
-  height: 100%;
+  height: auto; /* Grow with content instead of being locked to container height */
   transition: width 0.1s ease;
   overflow: visible; /* Changed from hidden to visible to show all content */
   min-width: 0; /* Allow column to shrink below content width */
@@ -1991,12 +1992,13 @@ getStoredDOI() {
   border-radius: 8px;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
   padding: 0.75rem;
-  height: 100%;
+  height: auto; /* Grow with content; the page scrolls instead of the panel */
+  flex: 1; /* Still fill the column so all panels keep equal visual height */
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
   flex-direction: column;
-  overflow: auto; /* Changed from hidden to auto to allow scrolling */
+  overflow: visible; /* No inner scrollbar; the page provides vertical scrolling */
   margin-right: 6px; /* Make space for the resizer */
   
   .panel-header {
@@ -2236,6 +2238,10 @@ getStoredDOI() {
   flex-grow: 1;
   display: flex;
   flex-direction: column;
+  /* Give the viewer a full-height area of its own now that the page scrolls,
+     instead of being squeezed into the leftover space of the panel */
+  height: calc(100vh - 253px);
+  min-height: 500px;
   overflow: hidden;
 }
 

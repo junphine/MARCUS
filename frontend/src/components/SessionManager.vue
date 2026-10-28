@@ -364,6 +364,9 @@ export default {
 .session-manager.session-active {
   background: none;
   display: block;
+  /* Back in the normal document flow so the whole page can scroll natively */
+  position: static;
+  width: 100%;
   height: auto;
   min-height: auto;
   padding: 0;

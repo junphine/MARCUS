@@ -21,15 +21,15 @@
               <line x1="10" y1="1" x2="10" y2="4"></line>
               <line x1="14" y1="1" x2="14" y2="4"></line>
             </svg>
-            by <a href="https://kohulanr.com" target="_blank">Kohulan Rajan</a> @ <a
-              href="https://github.com/Steinbeck-Lab" target="_blank">Steinbeck Lab</a>
+            by <a href="#" target="_blank"></a> AtomFlow-AI @ <a
+              href="https://github.com/AtomFlow-AI/MoleCode" target="_blank">MoleCode Lab</a>
           </div>
         </div>
 
         <!-- Right side: Links with icons -->
         <div class="links-section">
           <div class="footer-link-wrapper">
-            <a href="https://github.com/Kohulan/MARCUS" target="_blank" class="footer-link">
+            <a href="https://github.com/AtomFlow-AI/MoleCode" target="_blank" class="footer-link">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path
@@ -39,7 +39,7 @@
               GitHub
             </a>
             <div class="tooltip">
-              <span class="tooltip-text">Almost there! Kohulan is still cooking up.. </span>
+              <span class="tooltip-text">Almost there! ModeCode is still cooking up.. </span>
               <div class="tooltip-sparkle">✨</div>
             </div>
           </div>

@@ -165,7 +165,7 @@ export default {
 .app-container {
   display: flex;
   flex-direction: column;
-  height: 100vh; /* Changed from min-height to exact height */
+  min-height: 100vh; /* Grow with content so the page itself scrolls */
   background: var(--color-bg);
   color: var(--color-text);
   transition: background-color 0.3s ease, color 0.3s ease;
@@ -177,14 +177,14 @@ export default {
   max-width: 100%;
   margin: 0 auto;
   padding: 0.25rem 0.5rem; /* Reduced top/bottom padding from 0.5rem to 0.25rem */
-  overflow-y: auto; /* Allow scrolling within the content if needed */
-  min-height: calc(100vh - 113px); /* Adjusted for reduced header height (was 120px, now 113px) */
+  overflow-y: visible; /* No inner scroll container; the browser page scrolls instead */
+  min-height: calc(100vh - 125px); /* Adjusted for reduced header height (was 120px, now 113px) */
 }
 
 @media (min-width: 1200px) {
   .main-content {
     padding: 0.5rem 2rem; /* Reduced top/bottom padding from 2rem to 0.5rem, kept horizontal at 2rem */
-    min-height: calc(100vh - 113px); /* Adjusted for reduced header height (was 120px, now 113px) */
+    min-height: calc(100vh - 125px); /* Adjusted for reduced header height (was 120px, now 113px) */
   }
 }
 

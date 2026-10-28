@@ -16,10 +16,10 @@
     <div class="container">
       <!-- Enhanced Section Header with Animation -->
       <div class="section-header reveal-animation">
-        <div class="section-tag">About <span class="marcus-text">MARCUS</span></div>
+        <div class="section-tag">About MARCUS</div>
         <h2 class="section-title">Unraveling Chemical Structures with AI</h2>
         <p class="section-description">
-          Discover the story, mission, and team behind <span class="marcus-text">MARCUS</span> - Molecular Annotation and Recognition for Curating
+          Discover the story, mission, and team behind MARCUS - Molecular Annotation and Recognition for Curating
           Unravelled Structures
         </p>
       </div>

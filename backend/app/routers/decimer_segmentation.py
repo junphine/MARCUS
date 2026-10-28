@@ -245,7 +245,7 @@ async def extract_segments(
             "segments_extracted": True,
             "segments_already_existed": segments_result.get("segments_existed", False),
             "segments_count": segments_count,
-            "segments_directory": all_segments_rel_path,
+            "segments_directory": all_segments_rel_path.replace('\\','/'),
             "process_completed": True,
             "pdf_filename": safe_filename,
         }

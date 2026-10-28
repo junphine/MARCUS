@@ -339,7 +339,7 @@ def get_converted_document(path, number_of_pages=2):
     return conv_result_dict
 
 
-def extract_paper_content(doc_json):
+def extract_paper_main_content(doc_json):
     """
     Extract the title, abstract, and main text up to the results section from a document JSON.
 
@@ -358,16 +358,15 @@ def extract_paper_content(doc_json):
 
     # Find the title (usually the first section_header with level 1, but be more flexible)
     for text in texts:
+        content:str = text.get("text", "").strip()
+        if not content or content.isdigit():
+            continue
         if text.get("label") == "section_header" and text.get("level") == 1:
-            if (
-                "RESULTS" not in text.get("text", "").upper()
-                and len(text.get("text", "")) > 5  # Reduced from 10 to 5
-            ):
-                title = text.get("text", "")
+            if (len(content) > 10):
+                title = content
                 break
         # Also look for titles without level information
         elif text.get("label") == "section_header":
-            content = text.get("text", "").strip()
             if len(content) > 20 and not any(  # Look for substantial headers
                 keyword in content.upper()
                 for keyword in [
@@ -381,28 +380,35 @@ def extract_paper_content(doc_json):
                 title = content
                 break
 
+        # Look for large font text at the beginning
+        elif (
+                text.get("label") == "paragraph"
+                and text.get("page_number") == 1
+                and text.get("font_size", 0) > 12
+        ):
+            title = content
+
     # Find abstract section - look for both standalone "ABSTRACT" headers and inline "ABSTRACT:" text
     abstract_found = False
     abstract_section = []
     collecting_abstract = False
 
     for i, text in enumerate(texts):
-        content = text.get("text", "").strip()
+        content:str = text.get("text", "").strip()
 
-        if not content:
+        if not content or content.isdigit():
             continue
 
         # Check for standalone ABSTRACT header
         if text.get("label") == "section_header" and content.upper() == "ABSTRACT":
+            abstract_section.append(content)
             collecting_abstract = True
             abstract_found = True
             continue
 
         # Check for inline ABSTRACT: format
         if "ABSTRACT:" in content.upper():
-            abstract_section.append(
-                content.replace("ABSTRACT:", "").replace("Abstract:", "").strip()
-            )
+            abstract_section.append(content)
             abstract_found = True
             collecting_abstract = True
             continue
@@ -418,7 +424,7 @@ def extract_paper_content(doc_json):
             # Skip page headers/footers but be more inclusive
             if text.get("label") not in ["page_header", "page_footer"]:
                 # Only skip obvious metadata
-                if not any(
+                if len(content) > 100 and not any(
                     indicator in content.lower()
                     for indicator in [
                         "correspondence:",
@@ -429,6 +435,7 @@ def extract_paper_content(doc_json):
                     ]
                 ):
                     abstract_section.append(content)
+                    collecting_abstract = False
 
     abstract = " ".join(abstract_section)
 
@@ -443,6 +450,14 @@ def extract_paper_content(doc_json):
         # Skip empty content and page headers/footers
         if not content or text.get("label") in ["page_header", "page_footer"]:
             continue
+
+        if content==title:
+            continue
+
+        if text.get("label") == "section_header":
+            level = text.get("level",1)
+            title_prefix = '\n#'+'#'*int(level)+' '
+            content = title_prefix+content+'\n'
 
         # Look for introduction section header (like "1 | Introduction" or "Introduction")
         if text.get("label") == "section_header" and (
@@ -468,7 +483,6 @@ def extract_paper_content(doc_json):
             if any(
                 section in content.upper()
                 for section in [
-                    "RESULTS",
                     "REFERENCES",
                     "BIBLIOGRAPHY",
                     "ACKNOWLEDGMENT",
@@ -481,7 +495,7 @@ def extract_paper_content(doc_json):
             found_intro and page_no <= 6
         ):  # Limit to first 6 pages to avoid too much content
             # Only skip obvious metadata
-            if not any(
+            if len(content)>100 and not any(
                 indicator in content.lower()
                 for indicator in [
                     "correspondence:",
@@ -492,41 +506,10 @@ def extract_paper_content(doc_json):
                 ]
             ):
                 main_text.append(content)
-
-    # Enhanced fallback: if we didn't get much content, be more aggressive
-    if not abstract and not main_text:
-        # Get more content from early pages
-        for text in texts:
-            content = text.get("text", "").strip()
-            page_no = (
-                text.get("prov", [{}])[0].get("page_no", 1) if text.get("prov") else 1
-            )
-
-            # Skip page headers/footers and very short content
-            if (
-                not content
-                or text.get("label") in ["page_header", "page_footer"]
-                or len(content) < 5
-            ):
+                found_intro = False
                 continue
 
-            # Only process first 3 pages for fallback
-            if page_no > 3:
-                continue
-
-            # Only skip obvious metadata
-            if any(
-                indicator in content.lower()
-                for indicator in [
-                    "correspondence:",
-                    "received:",
-                    "funding:",
-                    "doi:",
-                    "copyright",
-                ]
-            ):
-                continue
-
+        if text.get("label") == "section_header":
             # Add to main_text
             main_text.append(content)
 
@@ -560,77 +543,7 @@ def extract_from_docling_document(data):
     """
     # For Docling format, we need to extract the main document structure
     if "schema_name" in data and data["schema_name"] == "DoclingDocument":
-        result = extract_paper_content(data)
-
-        # Check if any of the key components are empty and extract additional info if needed
-        if (
-            not result.get("title")
-            or not result.get("abstract")
-            or not result.get("main_text")
-        ):
-            # Try to extract more text based on document structure
-            texts = data.get("texts", [])
-
-            # If title is empty, try to find a likely title
-            if not result.get("title"):
-                for text in texts:
-                    content = text.get("text", "").strip()
-                    # Look for section headers that could be titles (longer than typical headers)
-                    if (
-                        text.get("label") == "section_header"
-                        and len(content) > 30
-                        and not any(
-                            keyword in content.upper()
-                            for keyword in [
-                                "ABSTRACT",
-                                "INTRODUCTION",
-                                "RESULTS",
-                                "METHODS",
-                                "EXPERIMENTAL",
-                            ]
-                        )
-                    ):
-                        result["title"] = content
-                        break
-                    # Look for large font text at the beginning
-                    elif (
-                        text.get("label") == "paragraph"
-                        and text.get("page_number") == 1
-                        and text.get("font_size", 0) > 12
-                    ):
-                        result["title"] = content
-                        break
-
-            # If abstract is still empty, use a more comprehensive approach
-            if not result.get("abstract"):
-                # Try to find abstract section by looking for structured content
-                abstract_texts = []
-                for i, text in enumerate(texts):
-                    content = text.get("text", "").strip()
-
-                    # Look for abstract-related content
-                    if any(
-                        keyword in content.lower()
-                        for keyword in [
-                            "introduction:",
-                            "objective:",
-                            "methodology:",
-                            "results:",
-                            "conclusion:",
-                        ]
-                    ):
-                        abstract_texts.append(content)
-
-                    # If we find "introduction" header, stop collecting
-                    if (
-                        text.get("label") == "section_header"
-                        and "introduction" in content.lower()
-                    ):
-                        break
-
-                if abstract_texts:
-                    result["abstract"] = " ".join(abstract_texts)
-
+        result = extract_paper_main_content(data)
         return result
     else:
         return {"error": "Not a valid Docling document format"}
@@ -678,13 +591,14 @@ def combine_to_paragraph(result_dict):
         combined_text.append(main_text)
 
     # Join with spaces and clean up formatting
-    combined_paragraph = " ".join(combined_text)
+    combined_paragraph = "\n".join(combined_text)
+    return combined_paragraph
 
+def text_formatting_clean(combined_paragraph):
     # Clean up the text formatting
-    # Replace newlines with spaces
-    combined_paragraph = combined_paragraph.replace("\n", " ")
+
     # Replace multiple spaces with single spaces
-    combined_paragraph = re.sub(r"\s+", " ", combined_paragraph)
+    combined_paragraph = re.sub(r"[^\S\r\n]+", " ", combined_paragraph)
     # Fix spacing around punctuation
     combined_paragraph = re.sub(r"\s+([.,;:?!])", r"\1", combined_paragraph)
     # Remove extra spaces around common symbols
@@ -697,13 +611,10 @@ def combine_to_paragraph(result_dict):
     # Fix common word breaks
     combined_paragraph = re.sub(r"(\w)-\s+(\w)", r"\1\2", combined_paragraph)
 
-    # Final cleanup - ensure single spaces
-    combined_paragraph = re.sub(r"\s+", " ", combined_paragraph).strip()
-
     return combined_paragraph
 
 
-async def extract_pdf_text(
+async def extract_pdf_text_with_headers(
     pdf_file: UploadFile = File(...),
     pages: int = Form(2, description="Number of pages to process"),
 ):
@@ -726,10 +637,6 @@ async def extract_pdf_text(
         HTTPException:
             - 400: If uploaded file is not a PDF
             - 500: If PDF processing fails
-
-    Example:
-        >>> result = _await extract_pdf_text(pdf_file, pages=2)
-        >>> print(result['text'][:100])
         "Title: Novel Chemical Analysis Abstract: This paper presents..."
     """
     if not pdf_file.filename.lower().endswith(".pdf"):
@@ -759,27 +666,20 @@ async def extract_pdf_text(
         # Process the PDF file
         json_data = get_converted_document(file_path, number_of_pages=pages)
         result = extract_from_docling_document(json_data)
+        # title + main text
         combined_text = combine_to_paragraph(result)
 
-        # Check if the extracted text has more than 10 words
-        if len(combined_text.split()) <= 10:
-            # If extracted text has 10 or fewer words, extract the whole first page
-            all_text = extract_full_page_text(json_data)
-            if all_text:
-                combined_text = all_text
+        # Check if the extracted text has more than 2000 chars
 
         # Additional check: if combined text is still too short or doesn't contain substantial content
-        elif (
-            len(combined_text.split()) < 100
-            or "introduction" not in combined_text.lower()
-            or "phytochemical analysis" in combined_text.lower()
-        ):
+        if (len(combined_text) <= 2000):
             # Try a more aggressive extraction approach for structured papers
             enhanced_text = extract_enhanced_paper_content(json_data)
-            if enhanced_text and len(enhanced_text.split()) > len(
-                combined_text.split()
-            ):
-                combined_text = enhanced_text
+            if enhanced_text:
+                combined_text += '\n---------------\n'
+                combined_text += enhanced_text
+
+        combined_text = text_formatting_clean(combined_text)
 
         return {"text": combined_text, "pdf_filename": safe_filename}
 
@@ -806,37 +706,16 @@ def extract_enhanced_paper_content(doc_json):
     texts = doc_json.get("texts", [])
     extracted_content = []
 
-    # Look for title - longest section header that's not a common section
-    title = ""
-    for text in texts:
-        if text.get("label") == "section_header":
-            content = text.get("text", "").strip()
-            if len(content) > 20 and not any(  # Reduced from 30 to 20
-                keyword in content.upper()
-                for keyword in [
-                    "ABSTRACT",
-                    "INTRODUCTION",
-                    "EXPERIMENTAL",
-                    "METHODS",
-                    "RESULTS",
-                ]
-            ):
-                title = content
-                break
-
-    if title:
-        extracted_content.append(title)
-
     # Extract structured abstract content (Introduction, Objective, etc.)
     abstract_content = []
     introduction_content = []
     main_content = []
     capturing_abstract = False
     capturing_introduction = False
-    capturing_main = False
+    capturing_main = True
 
     for i, text in enumerate(texts):
-        content = text.get("text", "").strip()
+        content:str = text.get("text", "").strip()
         page_no = text.get("prov", [{}])[0].get("page_no", 1) if text.get("prov") else 1
 
         # Skip empty content and headers/footers, but be more lenient
@@ -848,9 +727,8 @@ def extract_enhanced_paper_content(doc_json):
             continue
 
         # Check for abstract section
-        if text.get("label") == "section_header" and content.upper() == "ABSTRACT":
+        if text.get("label") == "section_header" and content.upper().startswith("ABSTRACT"):
             capturing_abstract = True
-            continue
 
         # Check for structured abstract content (Introduction:, Objective:, etc.)
         if capturing_abstract and any(
@@ -878,7 +756,6 @@ def extract_enhanced_paper_content(doc_json):
         ):
             capturing_abstract = False  # Stop capturing abstract
             capturing_introduction = True
-            continue
 
         # Check for main content sections
         if text.get("label") == "section_header" and any(
@@ -901,7 +778,6 @@ def extract_enhanced_paper_content(doc_json):
             if any(
                 section in content.upper()
                 for section in [
-                    "RESULTS",
                     "REFERENCES",
                     "BIBLIOGRAPHY",
                     "ACKNOWLEDGMENT",
@@ -946,7 +822,7 @@ def extract_enhanced_paper_content(doc_json):
                 abstract_content.append(content)
 
         # Capture introduction content (more pages but with comprehensive filtering)
-        if capturing_introduction and page_no <= 5:  # Increased from 3 to 5
+        elif capturing_introduction and page_no <= 5:  # Increased from 3 to 5
             # Filter out author information and unwanted content
             if (
                 not any(
@@ -982,7 +858,7 @@ def extract_enhanced_paper_content(doc_json):
                 introduction_content.append(content)
 
         # Capture main content with comprehensive filtering
-        if capturing_main and page_no <= 6:
+        elif capturing_main and page_no <= 30:
             # Filter out author information and unwanted content
             if (
                 not any(
@@ -1015,113 +891,19 @@ def extract_enhanced_paper_content(doc_json):
                 and not _is_author_line(content)
                 and not _is_unwanted_content(content)
             ):
+
+                if text.get("label") == "section_header":
+                    level = text.get("level",1)
+                    title_prefix = '\n#'+'#'*int(level)+' '
+                    content = title_prefix+content+'\n'
+
                 main_content.append(content)
 
-    # Combine all content
-    if title:
-        extracted_content.append(title)
-    if abstract_content:
-        extracted_content.extend(abstract_content)
-    if introduction_content:
-        extracted_content.extend(introduction_content)
+
     if main_content:
         extracted_content.extend(
-            main_content[:8]
+            main_content
         )  # Limit main content to avoid too much
-
-    # Remove duplicate title if it appears again in the content
-    if title and len(extracted_content) > 1:
-        # Check if title appears as duplicate in the content
-        title_words = set(title.lower().split())
-        filtered_content = [title]  # Keep the original title
-
-        for content_piece in extracted_content[1:]:  # Skip the first title
-            content_words = set(content_piece.lower().split())
-            # If more than 70% of words match the title, skip it
-            if len(title_words & content_words) / max(len(title_words), 1) < 0.7:
-                filtered_content.append(content_piece)
-
-        extracted_content = filtered_content
-
-    # Enhanced fallback with more comprehensive extraction
-    if len(extracted_content) < 5:  # Increased threshold from 3 to 5
-        extracted_content = []
-        if title:
-            extracted_content.append(title)
-
-        for text in texts:
-            content = text.get("text", "").strip()
-            page_no = (
-                text.get("prov", [{}])[0].get("page_no", 1) if text.get("prov") else 1
-            )
-
-            # Process first 4 pages instead of 2
-            if page_no > 4:
-                continue
-
-            # Skip empty content and headers/footers, but be more lenient
-            if (
-                not content
-                or text.get("label") in ["page_header", "page_footer"]
-                or len(content) < 5  # Reduced from 10 to 5
-            ):
-                continue
-
-            # Enhanced filtering - skip author info, metadata, and unwanted content
-            if (
-                any(
-                    indicator in content.lower()
-                    for indicator in [
-                        "correspondence:",
-                        "received:",
-                        "funding:",
-                        "doi:",
-                        "copyright",
-                        "journal of",
-                        "volume",
-                        "issue",
-                        "@",  # Email addresses
-                        "university",
-                        "institute",
-                        "department",
-                        "college",
-                        "school of",
-                        "faculty of",
-                        "laboratory",
-                        "lab ",
-                        "center for",
-                        "centre for",
-                        "hospital",
-                        "medical center",
-                        "research center",
-                        "orcid",
-                        "author",
-                        "affiliation",
-                    ]
-                )
-                or _is_author_line(content)
-                or _is_unwanted_content(content)
-            ):
-                continue
-
-            # Skip if it's just page numbers or obvious journal info
-            if content.isdigit() or (
-                len(content) < 50
-                and any(
-                    journal in content.lower()
-                    for journal in [
-                        "phytochemical analysis",
-                        "john wiley",
-                        "doi.org",
-                        "elsevier",
-                        "springer",
-                    ]
-                )
-            ):
-                continue
-
-            # Include meaningful text content
-            extracted_content.append(content)
 
     # Combine and clean the text
     combined = " ".join(extracted_content)
@@ -1140,138 +922,6 @@ def extract_enhanced_paper_content(doc_json):
 
     combined = ". ".join(unique_sentences)
 
-    # Clean up the text
-    combined = combined.replace("\n", " ")
-    combined = re.sub(r"\s+", " ", combined)
-    combined = re.sub(r"\s+([.,;:?!])", r"\1", combined)
-    combined = re.sub(r"\s*\|\s*", " | ", combined)
-    combined = re.sub(r"\s*~\s*", " ", combined)
-    combined = re.sub(r"[ŒœŸÿ]", "", combined)
-    combined = re.sub(r"(\w)-\s+(\w)", r"\1\2", combined)
-    combined = re.sub(r"\s+", " ", combined).strip()
-
     return combined
 
 
-def extract_full_page_text(doc_json):
-    """
-    Extract all text content from the first few pages of a document.
-
-    Retrieves and concatenates all text elements from the first few pages,
-    excluding headers and footers, with cleaned formatting.
-
-    Args:
-        doc_json (dict): The JSON representation of the document structure.
-
-    Returns:
-        str: Concatenated and cleaned text from the first few pages.
-             Falls back to all pages if page numbers are unavailable.
-
-    Example:
-        >>> text = extract_full_page_text(document_json)
-        >>> print(len(text.split()))
-        245
-    """
-    # Get all text elements
-    texts = doc_json.get("texts", [])
-
-    # Filter texts from the first few pages (expanded from just page 1)
-    early_page_texts = []
-    for text in texts:
-        # Check page number from prov data
-        page_no = 1
-        if text.get("prov") and len(text.get("prov", [])) > 0:
-            page_no = text.get("prov")[0].get("page_no", 1)
-
-        # Check if this text element is on first 3 pages (expanded from just page 1)
-        if page_no <= 3:
-            content = text.get("text", "").strip()
-            if content and text.get("label") not in ["page_header", "page_footer"]:
-                # Enhanced filtering to exclude author information and unwanted content
-                if (
-                    not any(
-                        indicator in content.lower()
-                        for indicator in [
-                            "correspondence:",
-                            "received:",
-                            "funding:",
-                            "doi:",
-                            "copyright",
-                            "@",  # Email addresses
-                            "university",
-                            "institute",
-                            "department",
-                            "college",
-                            "school of",
-                            "faculty of",
-                            "laboratory",
-                            "lab ",
-                            "center for",
-                            "centre for",
-                            "hospital",
-                            "medical center",
-                            "research center",
-                            "orcid",
-                            "author",
-                            "affiliation",
-                        ]
-                    )
-                    and not _is_author_line(content)
-                    and not _is_unwanted_content(content)
-                ):
-                    early_page_texts.append(content)
-
-    # Enhanced fallback if there's no early page content
-    if not early_page_texts and texts:
-        # Take first reasonable number of text elements as fallback
-        for i, text in enumerate(texts[:30]):  # Increased from 20 to 30 elements
-            content = text.get("text", "").strip()
-            if content and text.get("label") not in ["page_header", "page_footer"]:
-                # Enhanced filtering to exclude author information and unwanted content
-                if (
-                    not any(
-                        indicator in content.lower()
-                        for indicator in [
-                            "correspondence:",
-                            "received:",
-                            "funding:",
-                            "doi:",
-                            "copyright",
-                            "@",  # Email addresses
-                            "university",
-                            "institute",
-                            "department",
-                            "college",
-                            "school of",
-                            "faculty of",
-                            "laboratory",
-                            "lab ",
-                            "center for",
-                            "centre for",
-                            "hospital",
-                            "medical center",
-                            "research center",
-                            "orcid",
-                            "author",
-                            "affiliation",
-                        ]
-                    )
-                    and not _is_author_line(content)
-                    and not _is_unwanted_content(content)
-                ):
-                    early_page_texts.append(content)
-
-    # Join all text elements with spaces
-    full_text = " ".join(early_page_texts)
-
-    # Clean up the text similar to combine_to_paragraph function
-    full_text = full_text.replace("\n", " ")
-    full_text = re.sub(r"\s+", " ", full_text)
-    full_text = re.sub(r"\s+([.,;:?!])", r"\1", full_text)
-    full_text = re.sub(r"\s*\|\s*", " | ", full_text)
-    full_text = re.sub(r"\s*~\s*", " ", full_text)
-    full_text = re.sub(r"[ŒœŸÿ]", "", full_text)
-    full_text = re.sub(r"(\w)-\s+(\w)", r"\1\2", full_text)
-    full_text = re.sub(r"\s+", " ", full_text).strip()
-
-    return full_text
