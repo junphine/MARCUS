@@ -577,14 +577,19 @@ async def get_highlighted_page(
         # Extract segment information from filename
         # Expected format: page_{page_num}_{segment_num}_segmented.png
         match = re.match(r"page_(\d+)_(\d+)_segmented\.png", segment_filename)
+        if match:
+            page_num = int(match.group(1))
+            segment_num = int(match.group(2))
+        else:
+            match = re.match(r"picture_(\d+)_segmented\.png", segment_filename)
+            if match:
+                page_num = 0
+                segment_num = int(match.group(1))
         if not match:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Invalid segment filename format: {segment_filename}",
             )
-
-        page_num = int(match.group(1))
-        segment_num = int(match.group(2))
         segment_id = f"segment-{page_num}-{segment_num}"
 
         # Get the highlighted page image

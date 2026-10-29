@@ -253,13 +253,21 @@ export default {
                 const meta = await pdfDocument.getMetadata();
                 docTitle.value = meta.info?.Title || '';
                 
-                // Try to get file size from HEAD request
-                fetch(props.pdfUrl, { method: 'HEAD' })
-                    .then(r => {
-                        const size = parseInt(r.headers.get('content-length'));
-                        if (!isNaN(size)) fileSize.value = size;
-                    })
-                    .catch(() => fileSize.value = null);
+                // Try to get file size (blob:/data: URLs don't support HEAD requests)
+                if (props.pdfUrl && props.pdfUrl.startsWith('blob:')) {
+                    // Blob is already in memory - read its size directly
+                    fetch(props.pdfUrl)
+                        .then(r => r.blob())
+                        .then(b => fileSize.value = b.size)
+                        .catch(() => fileSize.value = null);
+                } else if (props.pdfUrl) {
+                    fetch(props.pdfUrl, { method: 'HEAD' })
+                        .then(r => {
+                            const size = parseInt(r.headers.get('content-length'));
+                            if (!isNaN(size)) fileSize.value = size;
+                        })
+                        .catch(() => fileSize.value = null);
+                }
                 
                 // Render all pages in continuous mode
                 await renderAllPages();

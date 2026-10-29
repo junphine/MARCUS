@@ -224,7 +224,7 @@
         if (!engine) return '';
         
         const engineMap = {
-          'decimer': 'DECIMER',
+          'molecode': 'MoleCode',
           'molnextr': 'MolNexTR',
           'molscribe': 'MolScribe'
         };

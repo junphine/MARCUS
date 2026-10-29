@@ -23,8 +23,8 @@ const ocsrService = {
    * @param {File|null} imageFile - The chemical structure image file (optional)
    * @param {string|null} imagePath - Path to an existing image on the server (optional)
    * @param {Object} options - Processing options
-   * @param {string} options.engine - OCSR engine to use ('decimer', 'molnextr', or 'molscribe')
-   * @param {boolean} options.handDrawn - Whether to use the hand-drawn model (only for DECIMER)
+   * @param {string} options.engine - OCSR engine to use ('molecode', 'molnextr', or 'molscribe')
+   * @param {boolean} options.handDrawn - Whether to use the hand-drawn model (only for MoleCode)
    * @returns {Promise} - Promise with the generated SMILES data
    */
   generateSmiles: async (imageFile = null, imagePath = null, options = {}) => {
@@ -43,7 +43,7 @@ const ocsrService = {
     }
     
     // Add options
-    formData.append('engine', options.engine || 'decimer')
+    formData.append('engine', options.engine || 'molecode')
     formData.append('hand_drawn', options.handDrawn || false)
     
     // Use session-aware API client for file uploads
@@ -110,8 +110,8 @@ const ocsrService = {
    * @param {File|null} imageFile - The chemical structure image file (optional)
    * @param {string|null} imagePath - Path to an existing image on the server (optional)
    * @param {Object} options - Processing options
-   * @param {string} options.engine - OCSR engine to use ('decimer', 'molnextr', or 'molscribe')
-   * @param {boolean} options.handDrawn - Whether to use the hand-drawn model (only for DECIMER)
+   * @param {string} options.engine - OCSR engine to use ('molecode', 'molnextr', or 'molscribe')
+   * @param {boolean} options.handDrawn - Whether to use the hand-drawn model (only for MoleCode)
    * @returns {Promise} - Promise with both SMILES and molfile data
    */
   generateBoth: async (imageFile = null, imagePath = null, options = {}) => {
@@ -154,8 +154,8 @@ const ocsrService = {
    * @param {File|null} imageFile - The chemical structure image file (optional)
    * @param {string|null} imagePath - Path to an existing image on the server (optional)
    * @param {Object} options - Processing options
-   * @param {string} options.engine - OCSR engine to use ('decimer', 'molnextr', or 'molscribe')
-   * @param {boolean} options.handDrawn - Whether to use the hand-drawn model (only for DECIMER)
+   * @param {string} options.engine - OCSR engine to use ('molecode', 'molnextr', or 'molscribe')
+   * @param {boolean} options.handDrawn - Whether to use the hand-drawn model (only for MoleCode)
    * @param {string} options.depictEngine - Depiction engine to use ('rdkit' or 'cdk')
    * @param {string} options.depictFormat - Depiction format ('svg', 'png', or 'base64')
    * @returns {Promise} - Promise with OCSR results and depiction
@@ -311,8 +311,8 @@ const ocsrService = {
  * Process multiple segments with OCSR
  * @param {Array} segments - Array of segment objects with imageUrl or path
  * @param {Object} options - Processing options
- * @param {string} options.engine - OCSR engine to use ('decimer', 'molnextr', or 'molscribe')
- * @param {boolean} options.handDrawn - Whether to use the hand-drawn model (only for DECIMER)
+ * @param {string} options.engine - OCSR engine to use ('molecode', 'molnextr', or 'molscribe')
+ * @param {boolean} options.handDrawn - Whether to use the hand-drawn model (only for MoleCode)
  * @param {boolean} options.includeMolfile - Whether to include molfile data (for molnextr and molscribe)
  * @param {string} options.pdfId - Unique ID for the current PDF to prevent mixing structures
  * @returns {Promise} - Promise with array of processed structures

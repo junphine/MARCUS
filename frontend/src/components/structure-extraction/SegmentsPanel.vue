@@ -189,7 +189,7 @@ export default {
   },
   data() {
     return {
-      selectedModel: 'decimer',
+      selectedModel: 'molecode',
       isLoading: false,
       modelOptions: {
         handDrawn: false,
@@ -199,7 +199,7 @@ export default {
       imageSuccess: {},
       selectedSegment: null,
       isProcessingSegment: false,
-      comparisonEngines: ['decimer', 'molnextr', 'molscribe'],
+      comparisonEngines: ['molecode', 'molnextr', 'molscribe'],
       showDebugInfo: process.env.NODE_ENV === 'development' || false,
       // Track processedStructuresMap by filename
       processedStructuresMap: new Map(),
@@ -252,6 +252,10 @@ export default {
             if (parts.length > 2 && parts[0] === 'page') {
               pageNum = parseInt(parts[1], 10) || pageNum;
               segmentNum = parts.length > 2 ? parseInt(parts[2], 10) || segmentNum : segmentNum;
+            }
+            if (parts.length > 2 && parts[0] === 'picture') {
+              // Override with filename info if available (more reliable)
+              segmentNum = parseInt(parts[1], 10);
             }
           }
           
@@ -436,6 +440,10 @@ export default {
           // Override with filename info if available (more reliable)
           pageNum = parseInt(parts[1], 10) || pageNum;
           segmentNum = parts.length > 2 ? parseInt(parts[2], 10) || segmentNum : segmentNum;
+        }
+        if (parts.length > 2 && parts[0] === 'picture') {
+          // Override with filename info if available (more reliable)
+          segmentNum = parseInt(parts[1], 10);
         }
       }
 
@@ -723,7 +731,7 @@ export default {
         const options = {
           engine: engine,
           handDrawn: false,
-          includeMolfile: engine !== 'decimer' // Always use molfile for non-DECIMER engines
+          includeMolfile: engine !== 'molecode' // Always use molfile for non-MoleCode engines
         }
 
         // Process the segment with this engine
@@ -852,7 +860,7 @@ export default {
       if (!engine) return 'Unknown';
 
       const displayNames = {
-        'decimer': 'DECIMER',
+        'molecode': 'MolCode',
         'molnextr': 'MolNexTR',
         'molscribe': 'MolScribe'
       };
@@ -927,7 +935,6 @@ export default {
   .segments-content {
     display: flex;
     flex-direction: column;
-    height: 100%;
     overflow: hidden;
 
     .segments-actions {

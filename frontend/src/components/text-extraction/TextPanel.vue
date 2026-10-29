@@ -30,10 +30,37 @@
       </div>
       
       <div class="text-display">
-        <HighlightedText 
-          :text="extractedText"
-          :annotations="annotations"
-        />
+        <div class="view-toggle">
+          <button
+            class="toggle-btn"
+            :class="{ active: viewMode === 'preview' }"
+            @click="viewMode = 'preview'"
+          >
+            <vue-feather type="eye" class="icon"></vue-feather>
+            Preview
+          </button>
+          <button
+            class="toggle-btn"
+            :class="{ active: viewMode === 'markdown' }"
+            @click="viewMode = 'markdown'"
+          >
+            <vue-feather type="code" class="icon"></vue-feather>
+            Markdown
+          </button>
+        </div>
+
+        <div
+          v-show="viewMode === 'preview'"
+          class="markdown-preview"
+          v-html="renderedMarkdown"
+        ></div>
+
+        <div v-show="viewMode === 'markdown'" class="markdown-raw">
+          <HighlightedText
+            :text="extractedText"
+            :annotations="annotations"
+          />
+        </div>
       </div>
       
       <div v-if="annotations && annotations.length > 0" class="annotations-section">
@@ -56,6 +83,7 @@
 </template>
 
 <script>
+import { marked } from 'marked'
 import HighlightedText from './HighlightedText.vue'
 import AnnotationViewer from './AnnotationViewer.vue'
 
@@ -79,9 +107,18 @@ export default {
       default: false
     }
   },
+  data() {
+    return {
+      viewMode: 'preview' // 'preview' | 'markdown'
+    }
+  },
   computed: {
     hasText() {
       return !!this.extractedText
+    },
+    renderedMarkdown() {
+      if (!this.extractedText) return ''
+      return marked.parse(this.extractedText)
     }
   },
   methods: {
@@ -90,12 +127,12 @@ export default {
     },
     downloadText() {
       if (!this.extractedText) return
-      
-      const blob = new Blob([this.extractedText], { type: 'text/plain' })
+
+      const blob = new Blob([this.extractedText], { type: 'text/markdown' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = 'extracted_text.txt'
+      a.download = 'extracted_text.md'
       a.click()
       URL.revokeObjectURL(url)
     },
@@ -199,6 +236,142 @@ export default {
       overflow-y: auto;
       margin-bottom: 1.5rem;
       min-height: 200px;
+
+      .view-toggle {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+        border-bottom: 1px solid var(--color-border, #e2e8f0);
+        padding-bottom: 0.75rem;
+
+        .toggle-btn {
+          display: flex;
+          align-items: center;
+          gap: 0.4rem;
+          padding: 0.4rem 0.9rem;
+          border: 1px solid var(--color-border, #e2e8f0);
+          border-radius: var(--radius-md, 8px);
+          background: transparent;
+          color: var(--color-text-light);
+          font-size: 0.875rem;
+          cursor: pointer;
+          transition: all 0.2s ease;
+
+          .icon {
+            width: 14px;
+            height: 14px;
+          }
+
+          &:hover {
+            color: var(--color-primary);
+            border-color: var(--color-primary);
+          }
+
+          &.active {
+            background-color: var(--color-primary);
+            border-color: var(--color-primary);
+            color: #fff;
+          }
+        }
+      }
+
+      .markdown-preview {
+        font-size: 1rem;
+        line-height: 1.6;
+        color: var(--color-text);
+
+        ::v-deep(h1),
+        ::v-deep(h2),
+        ::v-deep(h3),
+        ::v-deep(h4),
+        ::v-deep(h5),
+        ::v-deep(h6) {
+          margin: 1.25rem 0 0.75rem;
+          line-height: 1.3;
+
+          &:first-child {
+            margin-top: 0;
+          }
+        }
+
+        ::v-deep(p) {
+          margin-bottom: 1rem;
+
+          &:last-child {
+            margin-bottom: 0;
+          }
+        }
+
+        ::v-deep(ul),
+        ::v-deep(ol) {
+          margin-bottom: 1rem;
+          padding-left: 1.5rem;
+        }
+
+        ::v-deep(blockquote) {
+          margin: 0 0 1rem;
+          padding-left: 1rem;
+          border-left: 3px solid var(--color-primary);
+          color: var(--color-text-light);
+        }
+
+        ::v-deep(code) {
+          background-color: rgba(0, 0, 0, 0.06);
+          border-radius: 4px;
+          padding: 0.1rem 0.35rem;
+          font-size: 0.875em;
+        }
+
+        ::v-deep(pre) {
+          background-color: rgba(0, 0, 0, 0.06);
+          border-radius: var(--radius-md, 8px);
+          padding: 1rem;
+          overflow-x: auto;
+          margin-bottom: 1rem;
+
+          code {
+            background: none;
+            padding: 0;
+          }
+        }
+
+        ::v-deep(table) {
+          border-collapse: collapse;
+          width: 100%;
+          margin-bottom: 1rem;
+
+          th,
+          td {
+            border: 1px solid var(--color-border, #e2e8f0);
+            padding: 0.5rem 0.75rem;
+            text-align: left;
+          }
+
+          th {
+            background-color: rgba(0, 0, 0, 0.04);
+          }
+        }
+
+        ::v-deep(img) {
+          max-width: 100%;
+          height: auto;
+        }
+
+        ::v-deep(a) {
+          color: var(--color-primary);
+        }
+
+        ::v-deep(hr) {
+          border: none;
+          border-top: 1px solid var(--color-border, #e2e8f0);
+          margin: 1.5rem 0;
+        }
+      }
+
+      .markdown-raw {
+        font-family: monospace;
+        font-size: 0.9rem;
+      }
     }
     
     .annotations-section {

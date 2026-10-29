@@ -151,7 +151,7 @@ export default {
       findingMCS: false,
       useCoordinatesForDepiction: true, // Default to using coordinates for better depiction
       results: [
-        { engine: 'decimer', smiles: '', molfile: null, error: null, processingTime: null, useCoordinates: false },
+        { engine: 'molecode', smiles: '', molfile: null, error: null, processingTime: null, useCoordinates: false },
         { engine: 'molnextr', smiles: '', molfile: null, error: null, processingTime: null, useCoordinates: true },
         { engine: 'molscribe', smiles: '', molfile: null, error: null, processingTime: null, useCoordinates: true }
       ],
@@ -175,20 +175,20 @@ export default {
   methods: {
     engineClass(engine) {
       return {
-        'decimer-engine': engine === 'decimer',
+        'molecode-engine': engine === 'molecode',
         'molnextr-engine': engine === 'molnextr',
         'molscribe-engine': engine === 'molscribe'
       };
     },
     engineIcon(engine) {
-      if (engine === 'decimer') return 'cpu';
+      if (engine === 'molecode') return 'llm';
       if (engine === 'molnextr') return 'grid';
       if (engine === 'molscribe') return 'edit-3';
       return 'box';
     },
     shouldUseCoordinates(result) {
-      // Don't use coordinates for DECIMER (it doesn't provide any)
-      if (result.engine === 'decimer') {
+      // Don't use coordinates for MoleCode (it doesn't provide any)
+      if (result.engine === 'molecode') {
         return false;
       }
       
@@ -216,7 +216,7 @@ export default {
         // If we don't have at least 2 valid molfiles, but we have valid SMILES,
         // convert SMILES to molfiles using the depiction service first
         if (!hasValidMolfiles) {
-          // Generate molfiles for engines that only provide SMILES (like DECIMER)
+          // Generate molfiles for engines that only provide SMILES (like MoleCode)
           for (const result of this.results) {
             if (!result.error && result.smiles && !result.molfile) {
               try {
@@ -315,12 +315,12 @@ export default {
         result.error = null;
         result.processingTime = null;
         // Set default useCoordinates based on engine
-        result.useCoordinates = result.engine !== 'decimer';
+        result.useCoordinates = result.engine !== 'molecode';
       });
       
       try {
         // Process segment with all three engines in parallel
-        const engines = ['decimer', 'molnextr', 'molscribe'];
+        const engines = ['molecode', 'molnextr', 'molscribe'];
         const processPromises = engines.map(engine => this.processWithEngine(engine));
         
         await Promise.all(processPromises);
@@ -346,12 +346,12 @@ export default {
         console.log(`Processing segment with ${engine} engine: ${imagePath}`);
         
         // Always include molfile for MolNexTR and MolScribe for comparison purposes
-        const includeMolfile = engine !== 'decimer';
+        const includeMolfile = engine !== 'molecode';
         
         // Process the segment using ocsrService
         const options = {
           engine: engine,
-          handDrawn: engine === 'decimer' ? false : undefined,
+          handDrawn: engine === 'molecode' ? false : undefined,
           includeMolfile: includeMolfile,
           depictEngine: 'rdkit', // Use RDKit for immediate visualization
           depictFormat: 'svg'
@@ -372,7 +372,7 @@ export default {
         let svg = null;
         try {
           // Use the appropriate input based on settings
-          const useCoords = engine !== 'decimer' && this.useCoordinatesForDepiction;
+          const useCoords = engine !== 'molecode' && this.useCoordinatesForDepiction;
           
           const depictionOptions = {
             engine: 'cdk', // Always use CDK for depiction
@@ -405,7 +405,7 @@ export default {
         this.results[resultIndex].svg = svg;
         this.results[resultIndex].processingTime = processingTime;
         this.results[resultIndex].error = null;
-        this.results[resultIndex].useCoordinates = engine !== 'decimer' && this.useCoordinatesForDepiction;
+        this.results[resultIndex].useCoordinates = engine !== 'molecode' && this.useCoordinatesForDepiction;
       } catch (error) {
         console.error(`Error processing with ${engine}:`, error);
         
@@ -423,7 +423,7 @@ export default {
       // Update the useCoordinates property of each result when the global setting changes
       this.results.forEach(result => {
         // Only change for MolNexTR and MolScribe
-        if (result.engine !== 'decimer') {
+        if (result.engine !== 'molecode') {
           result.useCoordinates = newValue;
         }
       });
@@ -548,7 +548,7 @@ export default {
         gap: 0.5rem;
         padding: 0.75rem;
         
-        &.decimer-engine {
+        &.molecode-engine {
           background-color: rgba(255, 149, 0, 0.1);
           
           .engine-icon {

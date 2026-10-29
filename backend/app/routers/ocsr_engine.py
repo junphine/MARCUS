@@ -35,8 +35,8 @@ class PathInput(BaseModel):
     """Model for inputting an image path."""
 
     path: str = Field(..., description="Path to the chemical structure image")
-    engine: Literal["decimer", "molnextr", "molscribe"] = Field(
-        "decimer", description="OCSR engine to use (decimer, molnextr, or molscribe)"
+    engine: Literal["molecode", "molnextr", "molscribe"] = Field(
+        "molecode", description="OCSR engine to use (molecode, molnextr, or molscribe)"
     )
 
 
@@ -141,8 +141,8 @@ async def generate_smiles(
     image_path: Optional[str] = Form(
         None, description="Path to existing chemical structure image"
     ),
-    engine: Literal["decimer", "molnextr", "molscribe"] = Form(
-        "decimer", description="OCSR engine to use"
+    engine: Literal["molecode", "molnextr", "molscribe"] = Form(
+        "molecode", description="OCSR engine to use"
     ),
     hand_drawn: bool = Form(
         False, description="Whether to use the hand-drawn model (only for DECIMER)"
@@ -156,7 +156,7 @@ async def generate_smiles(
     Args:
         image_file: The chemical structure image file to upload (optional)
         image_path: Path to an existing chemical structure image on the server (optional)
-        engine: OCSR engine to use (decimer, molnextr, or molscribe)
+        engine: OCSR engine to use (molecode, molnextr, or molscribe)
         hand_drawn: Whether to use the hand-drawn model (only applicable for DECIMER)
 
     Returns:
@@ -170,7 +170,7 @@ async def generate_smiles(
         )
 
     # Validate hand_drawn parameter - only applicable for DECIMER
-    if hand_drawn and engine != "decimer":
+    if hand_drawn and engine != "molecode":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="The hand_drawn parameter is only applicable for the DECIMER engine",
@@ -331,7 +331,7 @@ async def generate_both(
     image_path: Optional[str] = Form(
         None, description="Path to existing chemical structure image"
     ),
-    engine: Literal["decimer", "molnextr", "molscribe"] = Form(
+    engine: Literal["molecode", "molnextr", "molscribe"] = Form(
         "molnextr", description="OCSR engine to use"
     ),
     hand_drawn: bool = Form(
@@ -342,14 +342,14 @@ async def generate_both(
     Generate both SMILES and molfile from a chemical structure image.
 
     You can either upload a new image or provide the path to an existing image on the server.
-    Note: For the 'decimer' engine, only SMILES will be generated. MolNexTR and MolScribe
+    Note: For the 'molecode' engine, only SMILES will be generated. MolNexTR and MolScribe
     engines provide both SMILES and molfile. The hand_drawn parameter is only applicable
     when using the DECIMER engine.
 
     Args:
         image_file: The chemical structure image file to upload (optional)
         image_path: Path to an existing chemical structure image on the server (optional)
-        engine: OCSR engine to use (decimer, molnextr, or molscribe)
+        engine: OCSR engine to use (molecode, molnextr, or molscribe)
         hand_drawn: Whether to use the hand-drawn model (only applicable for DECIMER)
 
     Returns:
@@ -363,7 +363,7 @@ async def generate_both(
         )
 
     # Validate hand_drawn parameter - only applicable for DECIMER
-    if hand_drawn and engine != "decimer":
+    if hand_drawn and engine != "molecode":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="The hand_drawn parameter is only applicable for the DECIMER engine",
@@ -505,7 +505,7 @@ async def generate_with_depiction(
     image_path: Optional[str] = Form(
         None, description="Path to existing chemical structure image"
     ),
-    engine: Literal["decimer", "molnextr", "molscribe"] = Form(
+    engine: Literal["molecode", "molnextr", "molscribe"] = Form(
         "molnextr", description="OCSR engine to use"
     ),
     output_type: Literal["smiles", "molfile", "both"] = Form(
@@ -533,7 +533,7 @@ async def generate_with_depiction(
     Args:
         image_file: The chemical structure image file to upload (optional)
         image_path: Path to an existing chemical structure image on the server (optional)
-        engine: OCSR engine to use (decimer, molnextr, or molscribe)
+        engine: OCSR engine to use (molecode, molnextr, or molscribe)
         output_type: Type of chemical notation to generate (smiles, molfile, or both)
         hand_drawn: Whether to use the hand-drawn model (only applicable for DECIMER)
         depict_engine: Engine to use for molecular depiction (cdk or rdkit)

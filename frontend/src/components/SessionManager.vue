@@ -61,15 +61,15 @@
               <span class="service-name">COCONUT</span>
             </a>
             <a 
-              href="https://decimer.ai" 
+              href="https://molecode.ai"
               target="_blank" 
               rel="noopener noreferrer"
-              class="service-btn decimer-btn"
-              title="DECIMER - Deep Learning for Chemical Image Recognition"
+              class="service-btn molecode-btn"
+              title="ModeCode - An LLM-native, graph-explicit molecular language for Chemical Image Recognition"
               data-tooltip="Advanced AI-powered tool for extracting chemical structures from images and documents with high accuracy"
             >
-              <img src="@/assets/decimer-logo.png" alt="DECIMER" class="service-logo">
-              <span class="service-name">DECIMER</span>
+              <img src="@/assets/decimer-logo.png" alt="MoleCode" class="service-logo">
+              <span class="service-name">MoleCode</span>
             </a>
           </div>
         </div>

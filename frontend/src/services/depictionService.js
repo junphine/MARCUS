@@ -82,7 +82,7 @@ const depictionService = {
   
   /**
    * Generate a molfile from a SMILES string
-   * This is useful for engines like DECIMER that only provide SMILES
+   * This is useful for engines like MoleCode that only provide SMILES
    * @param {string} smiles - SMILES string to convert to molfile
    * @returns {Promise<Object>} - Promise with the generated molfile
    */

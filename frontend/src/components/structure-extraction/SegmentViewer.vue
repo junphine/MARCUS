@@ -283,20 +283,20 @@
 
               <!-- Engines results grid -->
               <div v-else class="engine-results-grid">
-                <!-- DECIMER Result Card -->
+                <!-- MoleCode Result Card -->
                 <div class="engine-result-card" :class="{ 'result-selected': selectedEngine === 'decimer' }">
                   <div class="engine-header decimer">
                     <div class="engine-icon-container">
                       <vue-feather type="cpu" class="engine-icon"></vue-feather>
                     </div>
-                    <h4 class="engine-name">DECIMER</h4>
+                    <h4 class="engine-name">MOLECODE</h4>
                   </div>
                   <div class="engine-content">
                     <!-- Structure visualization -->
                     <div class="structure-preview">
                       <img v-if="decimerResult && decimerResult.svg"
                         :src="'data:image/svg+xml;utf8,' + encodeURIComponent(decimerResult.svg)" class="result-image"
-                        alt="DECIMER result" />
+                        alt="MoleCode result" />
                       <div v-else-if="decimerResult && decimerResult.error" class="error-result">
                         <vue-feather type="alert-circle" class="error-icon"></vue-feather>
                         <p>{{ decimerResult.error }}</p>
@@ -325,9 +325,9 @@
 
                     <!-- Selection button -->
                     <div v-if="decimerResult && decimerResult.smiles && !decimerResult.error" class="selection-actions">
-                      <button class="select-prediction-btn" :class="{ 'active': selectedEngine === 'decimer' }"
-                        @click="selectPrediction('decimer')">
-                        <template v-if="selectedEngine === 'decimer'">
+                      <button class="select-prediction-btn" :class="{ 'active': selectedEngine === 'molecode' }"
+                        @click="selectPrediction('molecode')">
+                        <template v-if="selectedEngine === 'molecode'">
                           <vue-feather type="check-circle" size="16" class="btn-icon"></vue-feather>
                           <span>Selected</span>
                         </template>
@@ -673,7 +673,7 @@ export default {
       hasIdenticalResults: false,
       findingMCS: false, // Property for MCS finding
       // New properties for engine selection
-      selectedEngine: null, // Will store 'decimer', 'molnextr', or 'molscribe'
+      selectedEngine: null, // Will store 'molecode', 'molnextr', or 'molscribe'
       // New property to enable/disable auto analysis
       autoAnalysisEnabled: true,
       // Structure editor modal state
@@ -692,7 +692,7 @@ export default {
       if (!this.displayedStructure || !this.displayedStructure.engine) return ''
 
       const engine = this.displayedStructure.engine.toLowerCase()
-      if (engine.includes('decimer')) return 'decimer-tag'
+      if (engine.includes('molecode')) return 'decimer-tag'
       if (engine.includes('molnextr')) return 'molnextr-tag'
       if (engine.includes('molscribe')) return 'molscribe-tag'
 
@@ -849,7 +849,7 @@ export default {
 
       // Get valid SMILES strings
       const validSmiles = [];
-      if (this.decimerResult?.smiles) validSmiles.push({ engine: 'decimer', smiles: this.decimerResult.smiles });
+      if (this.decimerResult?.smiles) validSmiles.push({ engine: 'molecode', smiles: this.decimerResult.smiles });
       if (this.molnextrResult?.smiles) validSmiles.push({ engine: 'molnextr', smiles: this.molnextrResult.smiles });
       if (this.molscribeResult?.smiles) validSmiles.push({ engine: 'molscribe', smiles: this.molscribeResult.smiles });
 
@@ -1142,7 +1142,7 @@ export default {
       try {
         // Process all engines in parallel
         await Promise.all([
-          this.processEngine('decimer', imagePath),
+          this.processEngine('molecode', imagePath),
           this.processEngine('molnextr', imagePath),
           this.processEngine('molscribe', imagePath)
         ]);
@@ -1179,7 +1179,7 @@ export default {
         let svg = null;
         try {
           const useCoords = this.useCoordinatesForDisplay &&
-            engine !== 'decimer' &&
+            engine !== 'molecode' &&
             response.molfile;
 
           const depictionOptions = {
@@ -1209,7 +1209,7 @@ export default {
           processingTime: processingTime
         };
 
-        if (engine === 'decimer') {
+        if (engine === 'molecode') {
           this.decimerResult = result;
         } else if (engine === 'molnextr') {
           this.molnextrResult = result;
@@ -1232,7 +1232,7 @@ export default {
           processingTime: processingTime
         };
 
-        if (engine === 'decimer') {
+        if (engine === 'molecode') {
           this.decimerResult = errorResult;
         } else if (engine === 'molnextr') {
           this.molnextrResult = errorResult;
@@ -1406,14 +1406,14 @@ export default {
         }
 
         // Define the engines we want to compare
-        const engines = ['decimer', 'molnextr', 'molscribe'];
+        const engines = ['molecode', 'molnextr', 'molscribe'];
         const smilesList = [];
         const engineNames = [];
 
         // Collect SMILES from each engine
         if (this.decimerResult && this.decimerResult.smiles) {
           smilesList.push(this.decimerResult.smiles);
-          engineNames.push(engines[0]); // decimer
+          engineNames.push(engines[0]); // molecode
         }
 
         if (this.molnextrResult && this.molnextrResult.smiles) {
@@ -1481,7 +1481,7 @@ export default {
 
         if (this.decimerResult?.smiles && !this.decimerResult.error) {
           validResults.push({
-            engine: 'decimer',
+            engine: 'molecode',
             smiles: this.decimerResult.smiles,
             molfile: this.decimerResult.molfile
           });
@@ -1512,7 +1512,7 @@ export default {
         const molfiles = [];
         const engineNames = [];
 
-        // Convert ALL results to molfiles if needed (including DECIMER)
+        // Convert ALL results to molfiles if needed (including MoleCode)
         for (const result of validResults) {
           try {
             if (result.molfile) {
@@ -1632,7 +1632,7 @@ export default {
 
     getEngineDisplayName(engine) {
       const displayNames = {
-        'decimer': 'DECIMER',
+        'molecode': 'MoleCode',
         'molnextr': 'MolNexTR',
         'molscribe': 'MolScribe'
       };

@@ -3,28 +3,51 @@ import uuid
 import torch
 from typing import Tuple, Dict, Union, Literal, Any
 from pathlib import Path
+import contextlib
+import json
+import sys
+import traceback
 from fastapi import HTTPException, status
-
-from MolNexTR import get_predictions as molnextr_get_predictions
-from molscribe import MolScribe
 from app.config import UPLOAD_DIR
-
-_molscribe_model = None
 
 # Create a directory for chemical structure images
 IMAGES_DIR = os.path.join(UPLOAD_DIR, "chem_images")
 os.makedirs(IMAGES_DIR, exist_ok=True)
 
 
-def _get_recognizer():
-    from molscribe import MolScribe
-    from modelscope import snapshot_download
-    ckpt = snapshot_download(
-        repo_id="polyai/MolScribe",
-        allow_file_pattern="swin_base_char_aux_1m.pth",
-    )
-    _RECOGNIZER = MolScribe(ckpt, device=torch.device("cpu"))
+_molscribe_model = None
+_DETECTOR = None
+_RECOGNIZER = None
 
+
+def _get_detector():
+    global _DETECTOR
+    if _DETECTOR is None:
+        # Ultralytics + MolScribe both print startup chatter to stdout.
+        # stdout is our JSON channel — redirect any library noise to
+        # stderr so the parent only ever reads JSON lines.
+        with contextlib.redirect_stdout(sys.stderr):
+            from ultralytics import YOLO
+            from modelscope import snapshot_download
+            ckpt = snapshot_download(
+                repo_id="UniParser/MolDetv2",
+                allow_file_pattern="moldet_v2_yolo11n_960_doc.pt",
+            )
+            _DETECTOR = YOLO(ckpt+os.sep+"moldet_v2_yolo11n_960_doc.pt")
+    return _DETECTOR
+
+
+def _get_recognizer():
+    global _RECOGNIZER
+    if _RECOGNIZER is None:
+        with contextlib.redirect_stdout(sys.stderr):
+            from molscribe import MolScribe
+            from modelscope import snapshot_download
+            ckpt = snapshot_download(
+                repo_id="polyai/MolScribe",
+                allow_file_pattern="swin_base_char_aux_1m.pth",
+            )
+            _RECOGNIZER = MolScribe(ckpt+os.sep+"swin_base_char_aux_1m.pth", device=None)
     return _RECOGNIZER
 
 
@@ -85,6 +108,7 @@ def get_molnextr_prediction(
         )
 
 
+
 def init_molscribe(ckpt_path=None):
     """
     Initialize the MolScribe model.
@@ -95,6 +119,7 @@ def init_molscribe(ckpt_path=None):
     Returns:
         MolScribe: Initialized MolScribe model instance
     """
+    from molscribe import MolScribe
     global _molscribe_model
 
     if _molscribe_model is not None:
@@ -170,53 +195,6 @@ def get_molscribe_prediction(
         raise RuntimeError(f"Error in MolScribe prediction: {str(e)}")
 
 
-def get_smiles_ocsr(
-    path: Union[str, Path],
-    engine: Literal["decimer", "molnextr", "molscribe"] = "molscribe",
-    coordinates: bool = False,
-    hand_drawn: bool = False,
-) -> Union[Tuple[str, str], Tuple[str, str, str]]:
-    """
-    Get SMILES prediction from specified optical chemical structure recognition engine.
-
-    Args:
-        path: Path to the chemical structure image.
-        engine: The OCSR engine to use ("decimer", "molnextr", or "molscribe").
-        coordinates: Whether to return molecular coordinates (only applicable for molnextr and molscribe).
-        hand_drawn: Whether to use hand-drawn model (only applicable for DECIMER).
-
-    Returns:
-        If coordinates is False:
-            A tuple containing (image_name, smiles_string)
-        If coordinates is True and engine is "molnextr" or "molscribe":
-            A tuple containing (image_name, smiles_string, molfile_string)
-
-    Raises:
-        FileNotFoundError: If the specified path does not exist.
-        ValueError: If invalid engine or coordinates parameters are provided.
-    """
-    path = Path(path)
-    if not path.exists():
-        raise FileNotFoundError(f"Image file not found: {path}")
-
-    if engine not in ("decimer", "molnextr", "molscribe"):
-        raise ValueError(
-            "Invalid engine. Choose 'decimer', 'molnextr', or 'molscribe'."
-        )
-
-    if coordinates and engine == "decimer":
-        raise ValueError(
-            "Coordinates are only available when using the 'molnextr' or 'molscribe' engines."
-        )
-
-    if engine == "molscribe":
-        data_type = "both" if coordinates else "smiles"
-        return get_molscribe_prediction(path, data_type=data_type)
-    else:  # engine == "molnextr"
-        data_type = "both" if coordinates else "smiles"
-        return get_molnextr_prediction(path, data_type=data_type)
-
-
 def save_uploaded_image(file_content: bytes, filename: str) -> str:
     """
     Save an uploaded image to the images directory with a unique filename
@@ -245,7 +223,7 @@ def save_uploaded_image(file_content: bytes, filename: str) -> str:
 
 def process_chemical_structure(
     file_path: str,
-    engine: Literal["decimer", "molnextr", "molscribe"] = "decimer",
+    engine: Literal["molecode", "molnextr", "molscribe"] = "molecode",
     output_type: Literal["smiles", "molfile", "both"] = "smiles",
     hand_drawn: bool = False,
 ) -> Dict[str, Any]:
@@ -262,14 +240,6 @@ def process_chemical_structure(
         Dict: Results including image name, SMILES, and/or molfile
     """
     try:
-        # Import device info if available
-        try:
-            from MolNexTR import MolNexTRSingleton
-            device, device_name = MolNexTRSingleton.get_device()
-            hardware_info = device_name
-        except:
-            hardware_info = "Unknown"
-
         # Add support for MolScribe engine
         if engine == "molscribe":
             if output_type == "smiles":
@@ -306,47 +276,60 @@ def process_chemical_structure(
 
         # Original MolNexTR processing
         elif engine == "molnextr":
+            # Import device info if available
+            try:
+                from MolNexTR import MolNexTRSingleton
+                device, device_name = MolNexTRSingleton.get_device()
+                hardware_info = device_name
+            except:
+                hardware_info = "Unknown"
+            from MolNexTR import get_predictions as molnextr_get_predictions
+
             if output_type == "smiles":
-                image_name, smiles = get_smiles_ocsr(
-                    file_path, engine=engine, coordinates=False
+                image_name, smiles = get_molnextr_prediction(
+                    file_path, data_type="smiles"
                 )
-                result = molnextr_get_predictions(str(file_path), smiles=True)
                 return {
                     "image_name": image_name,
                     "smiles": smiles,
                     "engine": engine,
-                    "hardware": result.get("device_info", hardware_info),
+                    "hardware": hardware_info,
                 }
             elif output_type == "molfile":
                 image_name, molfile = get_molnextr_prediction(
                     file_path, data_type="predicted_molfile"
                 )
-                result = molnextr_get_predictions(
-                    str(file_path), predicted_molfile=True
-                )
                 return {
                     "image_name": image_name,
                     "molfile": molfile,
                     "engine": engine,
-                    "hardware": result.get("device_info", hardware_info),
+                    "hardware": hardware_info,
                 }
             else:  # output_type == "both"
                 image_name, smiles, molfile = get_molnextr_prediction(
                     file_path, data_type="both"
-                )
-                result = molnextr_get_predictions(
-                    str(file_path), smiles=True, predicted_molfile=True
                 )
                 return {
                     "image_name": image_name,
                     "smiles": smiles,
                     "molfile": molfile,
                     "engine": engine,
-                    "hardware": result.get("device_info", hardware_info),
+                    "hardware": hardware_info,
                 }
+        elif engine=='molecode':
+            from .molecode_wrapper import extract_smiles
+            result = extract_smiles(file_path)
+            return {
+                "image_name": result['image_name'],
+                "smiles": result['smiles'],
+                "molfile": result['graph'],
+                "engine": engine,
+                "hardware": 'cpu',
+            }
+
         else:
             raise ValueError(
-                f"Unsupported engine: {engine}. Choose 'decimer', 'molnextr', or 'molscribe'."
+                f"Unsupported engine: {engine}. Choose 'molecode', 'molnextr', or 'molscribe'."
             )
 
     except Exception as e:

@@ -1,0 +1,200 @@
+"""Best-effort conversion from E-SMILES captions to CXSMILES."""
+
+from __future__ import annotations
+
+import ast
+import re
+
+from rdkit import Chem
+
+try:
+    from . import chem_utils
+    from .translator import AtomIndex, Translator
+except ImportError:  # Support running from package directory as working directory.
+    import chem_utils
+    from translator import AtomIndex, Translator
+
+
+_RAW_GROUP_PATTERN = re.compile(r"<(?P<tag>a|c|d|r)>(?P<idx>\d+):(?P<label>.+?)</(?P=tag)>")
+_RING_GROUP_PATTERN = re.compile(r"<r>(?P<idx>\d+(?:,\d+)*):(?P<label>.+?)</r>")
+_PRECOMPAT_PATTERN = re.compile(r"<s>.*?</s>|<g>.*?</g>|<v>.*?</v>", re.DOTALL)
+
+
+def _raw_groups(groups: str) -> list[tuple[str, int, str]]:
+    groups = _PRECOMPAT_PATTERN.sub("", groups)
+    return [
+        (match.group("tag"), int(match.group("idx")), match.group("label"))
+        for match in _RAW_GROUP_PATTERN.finditer(groups)
+    ]
+
+
+def _caption_groups(caption: str) -> str:
+    if "<sep>" not in caption:
+        return ""
+    trailing = caption.split("<sep>", 1)[1]
+    groups, _ = Translator.parse_trailing(trailing)
+    return groups
+
+
+def _apply_atom_labels(mol: Chem.rdchem.Mol, groups: str) -> None:
+    """Preserve atom-indexed E-SMILES labels when CXSMILES can carry them."""
+    for desc in Translator.parse_groups(groups):
+        if not isinstance(desc.id, AtomIndex):
+            continue
+        atom_idx = int(desc.id)
+        if atom_idx >= mol.GetNumAtoms() or desc.is_dummy:
+            continue
+        label = str(desc)
+        if label:
+            mol.GetAtomWithIdx(atom_idx).SetProp("atomLabel", label)
+
+
+def _apply_raw_atom_labels(mol: Chem.rdchem.Mol, groups: str) -> None:
+    for tag, atom_idx, label in _raw_groups(groups):
+        if atom_idx >= mol.GetNumAtoms():
+            continue
+        if tag == "c":
+            mol.GetAtomWithIdx(atom_idx).SetProp("atomLabel", f"c{label}")
+        elif tag == "a" and label.startswith("<") and label not in ("<dum>", "<id>") and not label.startswith("<id>["):
+            mol.GetAtomWithIdx(atom_idx).SetProp("atomLabel", label)
+
+
+def _apply_sru_sgroup(mol: Chem.rdchem.Mol, label: str = "n") -> None:
+    if mol.GetNumAtoms() == 0:
+        return
+    sgroup = Chem.CreateMolSubstanceGroup(mol, "SRU")
+    sgroup.SetAtoms(list(range(mol.GetNumAtoms())))
+    sgroup.SetProp("LABEL", label)
+    sgroup.SetProp("CONNECT", "HT")
+
+
+def _ring_index_groups(groups: str) -> list[tuple[tuple[int, ...], str]]:
+    groups = _PRECOMPAT_PATTERN.sub("", groups)
+    records: list[tuple[tuple[int, ...], str]] = []
+    for match in _RING_GROUP_PATTERN.finditer(groups):
+        indexes = tuple(dict.fromkeys(int(part) for part in match.group("idx").split(",")))
+        records.append((indexes, match.group("label")))
+    return records
+
+
+def _add_ring_attachments(
+    mol: Chem.rdchem.Mol,
+    groups: str,
+) -> tuple[Chem.rdchem.Mol, list[tuple[int, tuple[int, ...]]]]:
+    """Represent ring-indexed groups as variable attachment dummy atoms."""
+    ring_info = mol.GetRingInfo().AtomRings()
+    attachments: list[tuple[int, tuple[int, ...]]] = []
+    ring_counts: dict[tuple[int, ...], int] = {}
+    used_anchor_atoms: set[int] = set()
+    rw_mol = Chem.RWMol(mol)
+
+    for ring_indexes, label in _ring_index_groups(groups):
+        if any(ring_idx >= len(ring_info) for ring_idx in ring_indexes):
+            continue
+        ring_atoms_list: list[int] = []
+        seen_atoms: set[int] = set()
+        for ring_idx in ring_indexes:
+            for atom_idx in ring_info[ring_idx]:
+                if atom_idx not in seen_atoms:
+                    seen_atoms.add(atom_idx)
+                    ring_atoms_list.append(atom_idx)
+        ring_atoms = tuple(ring_atoms_list)
+        substitutable_atoms = tuple(
+            atom_idx
+            for atom_idx in ring_atoms
+            if mol.GetAtomWithIdx(atom_idx).GetNumImplicitHs() > 0
+        )
+        available_atoms = tuple(
+            atom_idx
+            for atom_idx in substitutable_atoms
+            if atom_idx not in used_anchor_atoms
+        )
+        if not available_atoms:
+            continue
+
+        atom = Chem.Atom(0)
+        if label:
+            atom.SetProp("atomLabel", label)
+        dummy_idx = rw_mol.AddAtom(atom)
+        anchor_idx = available_atoms[
+            ring_counts.get(ring_indexes, 0) % len(available_atoms)
+        ]
+        ring_counts[ring_indexes] = ring_counts.get(ring_indexes, 0) + 1
+        used_anchor_atoms.add(anchor_idx)
+        rw_mol.AddBond(dummy_idx, anchor_idx, Chem.BondType.SINGLE)
+        attachments.append((dummy_idx, substitutable_atoms))
+
+    if not attachments:
+        return mol, attachments
+    output = rw_mol.GetMol()
+    Chem.SanitizeMol(output)
+    return output, attachments
+
+
+def _append_cx_fields(cxsmiles: str, fields: list[str]) -> str:
+    if not fields:
+        return cxsmiles
+    if " |" not in cxsmiles:
+        return f"{cxsmiles} |{','.join(fields)}|"
+
+    prefix, block = cxsmiles.rsplit(" |", 1)
+    if not block.endswith("|"):
+        return f"{cxsmiles} |{','.join(fields)}|"
+    return f"{prefix} |{block[:-1]},{','.join(fields)}|"
+
+
+def _ring_attachment_fields(
+    mol: Chem.rdchem.Mol,
+    attachments: list[tuple[int, tuple[int, ...]]],
+) -> list[str]:
+    if not attachments:
+        return []
+
+    Chem.MolToSmiles(mol, canonical=False, isomericSmiles=True)
+    try:
+        order = ast.literal_eval(mol.GetProp("_smilesAtomOutputOrder"))
+    except Exception:
+        order = list(range(mol.GetNumAtoms()))
+    output_idx = {atom_idx: idx for idx, atom_idx in enumerate(order)}
+
+    fields = []
+    for dummy_idx, ring_atoms in attachments:
+        if dummy_idx not in output_idx:
+            continue
+        targets = [output_idx[atom_idx] for atom_idx in ring_atoms if atom_idx in output_idx]
+        if targets:
+            fields.append(
+                f"m:{output_idx[dummy_idx]}:{'.'.join(str(idx) for idx in targets)}"
+            )
+    return fields
+
+
+def _convert_refactored_esmi_to_cxsmiles(
+    esmi: str,
+    source_groups: str = "",
+    sru: bool = False,
+) -> str:
+    """Convert a Translator-refactored E-SMILES string to CXSMILES."""
+    parsed = Translator.parse_caption(esmi)
+    if parsed is None:
+        return esmi.split("<sep>", 1)[0]
+    smi, groups, ext = parsed
+
+    mol = chem_utils.parse_smiles(smi)
+    if mol is None:
+        return smi
+
+    ring_groups = source_groups if "<r>" in source_groups else groups
+    mol, ring_attachments = _add_ring_attachments(mol, ring_groups)
+    _apply_atom_labels(mol, groups)
+    _apply_raw_atom_labels(mol, source_groups or groups)
+    parsed_ext = Translator.parse_extension(ext)
+    if sru or parsed_ext.startswith("Sg:"):
+        label = parsed_ext.split(":", 1)[1] if parsed_ext.startswith("Sg:") else "n"
+        _apply_sru_sgroup(mol, label=label or "n")
+
+    params = Chem.SmilesWriteParams()
+    params.canonical = not ring_attachments
+    params.doIsomericSmiles = True
+    cxsmiles = Chem.MolToCXSmiles(mol, params, Chem.CXSmilesFields.CX_ALL)
+    return _append_cx_fields(cxsmiles, _ring_attachment_fields(mol, ring_attachments))

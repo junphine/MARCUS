@@ -108,6 +108,10 @@ listSegmentFiles: async (directory) => {
         pageNum = parseInt(parts[1], 10) || 0;
         segmentIndex = parts.length > 2 ? parseInt(parts[2], 10) || 0 : 0;
       }
+      if (parts.length > 2 && parts[0] === 'picture') {
+        // Override with filename info if available (more reliable)
+        segmentIndex = parseInt(parts[1], 10);
+      }
       
       // Create a unique ID that includes the page number
       const uniqueId = `page-${pageNum}-segment-${segmentIndex}`;

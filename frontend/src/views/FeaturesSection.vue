@@ -158,7 +158,7 @@
         <div class="tech-logos">
           <div class="tech-logo">
             <span class="tech-img decimer-logo"></span>
-            <span class="tech-name">DECIMER</span>
+            <span class="tech-name">MoleCode</span>
           </div>
           <div class="tech-logo">
             <span class="tech-img molscribe-logo"></span>

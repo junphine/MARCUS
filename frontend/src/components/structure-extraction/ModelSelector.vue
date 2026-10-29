@@ -7,25 +7,25 @@
     
     <!-- Model Options -->
     <div class="model-options">
-      <!-- DECIMER Model -->
+      <!-- MoleCode Model -->
       <div 
         class="model-button"
         :class="{ 
-          active: modelValue === 'decimer',
+          active: modelValue === 'molecode',
           disabled: disabled 
         }"
-        @click="selectModel('decimer')"
+        @click="selectModel('molecode')"
         role="button"
         tabindex="0"
-        @keydown.enter="selectModel('decimer')"
-        @keydown.space="selectModel('decimer')"
+        @keydown.enter="selectModel('molecode')"
+        @keydown.space="selectModel('molecode')"
       >
         <input 
           type="radio" 
-          id="decimer" 
+          id="molecode"
           name="model" 
-          value="decimer"
-          :checked="modelValue === 'decimer'"
+          value="molecode"
+          :checked="modelValue === 'molecode'"
           :disabled="disabled"
           class="model-radio"
         />
@@ -36,10 +36,10 @@
         
         <div class="model-content">
           <div class="model-name">
-            DECIMER
+            MoleCode
             <span class="info-icon">i</span>
           </div>
-          <div class="model-tooltip">Deep learning based optical chemical structure recognition</div>
+          <div class="model-tooltip">LLM based optical chemical structure recognition</div>
         </div>
       </div>
       
@@ -118,8 +118,8 @@
     
     <!-- Configuration Section -->
     <div class="model-configuration" v-if="modelValue">
-      <!-- DECIMER Options -->
-      <div v-if="modelValue === 'decimer'" class="config-group">
+      <!-- MoleCode Options -->
+      <div v-if="modelValue === 'molecode'" class="config-group">
         <div class="toggle-option">
           <div class="toggle-switch" @click="toggleHandDrawn">
             <div 
@@ -130,7 +130,6 @@
             </div>
             <div class="toggle-content">
               <span class="toggle-label">Use Hand-drawn model</span>
-              <span class="toggle-subtitle">Optimized for hand-drawn chemical structures</span>
             </div>
           </div>
         </div>
@@ -160,7 +159,7 @@ export default {
   props: {
     modelValue: {
       type: String,
-      default: 'decimer'
+      default: 'molecode'
     },
     disabled: {
       type: Boolean,
@@ -183,9 +182,9 @@ export default {
     },
     modelValue(newVal) {
       // Reset options when model changes
-      if (newVal === 'decimer') {
+      if (newVal === 'molecode') {
         this.handDrawn = false;
-        this.includeCoordinates = false; // DECIMER doesn't use coordinates
+        this.includeCoordinates = false; // MoleCode doesn't use coordinates
       } else {
         // For MolNexTR and MolScribe, default to using coordinates
         this.includeCoordinates = true;
@@ -195,7 +194,7 @@ export default {
   },
   mounted() {
     // Initialize options based on initial model
-    if (this.modelValue === 'decimer') {
+    if (this.modelValue === 'molecode') {
       this.includeCoordinates = false;
     } else {
       this.includeCoordinates = true;
@@ -208,8 +207,8 @@ export default {
       this.$emit('update:modelValue', model)
       
       // Handle model-specific defaults
-      if (model === 'decimer') {
-        this.includeCoordinates = false; // DECIMER doesn't support molfiles
+      if (model === 'molecode') {
+        this.includeCoordinates = false; // MoleCode doesn't support molfiles
       } else {
         // Default to using coordinates for MolNexTR and MolScribe
         this.includeCoordinates = true;

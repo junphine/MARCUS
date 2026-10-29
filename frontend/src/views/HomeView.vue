@@ -2354,8 +2354,6 @@ getStoredDOI() {
   
   /* Make buttons stack on mobile */
   .action-buttons.prominent {
-    flex-direction: column;
-    
     .btn-large {
       width: 100%;
     }

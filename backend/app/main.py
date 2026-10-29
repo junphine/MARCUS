@@ -43,7 +43,7 @@ except ImportError:
 app = FastAPI(
     title="NP data extraction service",
     description="NP data extraction, a deep learning based text extraction service from journal articles for COCONUT",
-    terms_of_service="https://decimer.ai",
+    terms_of_service="https://molecode.ai",
     contact={
         "name": "Kohulan Rajan",
         "url": "https://cheminf.uni-jena.de/",
@@ -68,7 +68,7 @@ app = VersionedFastAPI(
     version_format="{major}",
     prefix_format="/v{major}",
     enable_latest=True,
-    terms_of_service="https://decimer.ai",
+    terms_of_service="https://molecode.ai",
     contact={
         "name": "Kohulan Rajan",
         "url": "https://cheminf.uni-jena.de/",

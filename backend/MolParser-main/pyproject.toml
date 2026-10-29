@@ -1,0 +1,60 @@
+[build-system]
+requires = ["setuptools>=78.1.1", "wheel>=0.45.1"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "molparser"
+version = "1.0.0"
+description = "MolParser Toolkit for Molecular Structure Parsing"
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+dependencies = [
+    "rdkit",
+    "pydantic",
+    "cairosvg",
+    "PyYAML",
+]
+
+[project.optional-dependencies]
+pdf = [
+    "pypdfium2",
+]
+moldet = [
+    "Pillow",
+    "ultralytics",
+]
+molparser = [
+    "Pillow",
+    "torch",
+    "transformers",
+    "huggingface_hub",
+    "safetensors",
+    "timm",
+    "opencv-python",
+    "numpy",
+]
+modelscope = [
+    "modelscope",
+]
+inference = [
+    "Pillow",
+    "torch",
+    "transformers",
+    "huggingface_hub",
+    "safetensors",
+    "timm",
+    "opencv-python",
+    "numpy",
+    "pypdfium2",
+    "ultralytics",
+    "modelscope",
+]
+
+[tool.setuptools.packages.find]
+include = ["molparser*"]
+
+[tool.setuptools.package-data]
+"molparser.models" = ["config.yaml"]
+"molparser.utils" = ["abbrevs_example.csv"]

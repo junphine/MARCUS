@@ -47,7 +47,7 @@ export default {
       type: String,
       default: ''
     },
-    // Original source engine (e.g., 'decimer', 'molnextr', 'molscribe')
+    // Original source engine (e.g., 'molecode', 'molnextr', 'molscribe')
     sourceEngine: {
       type: String,
       default: ''
@@ -95,14 +95,14 @@ export default {
     },
     // Added computed property for engine class
     engineClass() {
-      if (this.sourceEngine === 'decimer') return 'decimer-tag';
+      if (this.sourceEngine === 'molecode') return 'decimer-tag';
       if (this.sourceEngine === 'molnextr') return 'molnextr-tag';
       if (this.sourceEngine === 'molscribe') return 'molscribe-tag';
       return '';
     },
     // Added computed property for engine label
     engineLabel() {
-      if (this.sourceEngine === 'decimer') return 'DECIMER';
+      if (this.sourceEngine === 'molecode') return 'MoleCode';
       if (this.sourceEngine === 'molnextr') return 'MolNexTR';
       if (this.sourceEngine === 'molscribe') return 'MolScribe';
       return this.sourceEngine || 'Unknown engine';

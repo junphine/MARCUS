@@ -1,0 +1,4 @@
+rdkit
+pydantic
+cairosvg
+PyYAML

@@ -1,0 +1,11 @@
+Pillow
+torch
+transformers
+huggingface_hub
+safetensors
+timm
+opencv-python
+numpy
+pypdfium2
+ultralytics
+modelscope

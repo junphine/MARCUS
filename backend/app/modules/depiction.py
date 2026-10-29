@@ -204,7 +204,7 @@ def generate_depiction(
         source_type = "unknown"
 
         # For CDK engine
-        if molfile and use_molfile_directly:
+        if molfile and use_molfile_directly or smiles is None:
             # Use molfile directly with CDK - this is the preferred method for MolNexTR output
             try:
                 # Directly read molfile as CDK molecule

@@ -13,19 +13,19 @@ from jpype import startJVM
 
 
 def setup_jvm():
-    try:
-        jvmPath = getDefaultJVMPath()
-    except JVMNotFoundException:
-        print("If you see this message, for some reason JPype cannot find jvm.dll.")
-        print(
-            "This indicates that the environment variable JAVA_HOME is not set properly."
-        )
-        print("You can set it or set it manually in the code")
-        jvmPath = "Define/path/or/set/JAVA_HOME/variable/properly"
-
-    print(jvmPath)
 
     if not isJVMStarted():
+        try:
+            jvmPath = getDefaultJVMPath()
+        except JVMNotFoundException:
+            print("If you see this message, for some reason JPype cannot find jvm.dll.")
+            print(
+                "This indicates that the environment variable JAVA_HOME is not set properly."
+            )
+            print("You can set it or set it manually in the code")
+            jvmPath = "Define/path/or/set/JAVA_HOME/variable/properly"
+
+        print(jvmPath)
         paths = {
             "cdk-2.10": "https://github.com/cdk/cdk/releases/download/cdk-2.10/cdk-2.10.jar",
             "centres": "https://github.com/SiMolecule/centres/releases/download/1.0/centres.jar",
@@ -41,7 +41,6 @@ def setup_jvm():
         startJVM("-ea", "-Xmx4096M", classpath=[jar_paths[key] for key in jar_paths])
 
 
-setup_jvm()
 cdk_base = "org.openscience.cdk"
 
 
@@ -54,6 +53,7 @@ def get_CDK_IAtomContainer(smiles: str):
     Returns:
         mol (object): IAtomContainer with CDK.
     """
+    setup_jvm()
     SCOB = JClass(cdk_base + ".silent.SilentChemObjectBuilder")
     SmilesParser = JClass(
         cdk_base + ".smiles.SmilesParser",
@@ -73,6 +73,7 @@ def get_CDK_SDG(molecule: any):
     Returns:
         mol object: mol object with CDK SDG.
     """
+    setup_jvm()
     StructureDiagramGenerator = JClass(
         cdk_base + ".layout.StructureDiagramGenerator",
     )()
@@ -94,6 +95,7 @@ def get_CDK_SDG_mol(molecule: any, V3000=False) -> str:
     Returns:
         str: CDK Structure Diagram Layout mol block.
     """
+    setup_jvm()
     StringW = JClass("java.io.StringWriter")()
     moleculeSDG = get_CDK_SDG(molecule)
     SDFW = JClass(cdk_base + ".io.SDFWriter")(StringW)
@@ -280,6 +282,7 @@ def read_molfile_as_cdk_mol(molfile_string: str) -> Any:
     Raises:
         ValueError: If the molfile cannot be parsed
     """
+    setup_jvm()
     if not molfile_string:
         raise ValueError("No molfile content provided")
 

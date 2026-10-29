@@ -18,7 +18,7 @@ export default {
     segmentInfo: null, // Metadata about the segments
     processingOptions: {
       // Options for structure processing
-      engine: "decimer", // Default engine: 'decimer', 'molnextr', or 'molscribe'
+      engine: "molecode", // Default engine: 'molecode', 'molnextr', or 'molscribe'
       handDrawn: false,
       includeMolfile: false,
     },
@@ -318,10 +318,10 @@ export default {
       // Update processing options
       if (options.model) {
         // Validate model/engine value
-        const validEngines = ["decimer", "molnextr", "molscribe"];
+        const validEngines = ["molecode", "molnextr", "molscribe"];
         const engine = validEngines.includes(options.model)
           ? options.model
-          : "decimer";
+          : "molecode";
 
         // Auto-enable includeMolfile for molnextr and molscribe engines
         const includeMolfile =
@@ -570,7 +570,7 @@ export default {
       }
 
       // Get engines to compare
-      const engines = ["decimer", "molnextr", "molscribe"];
+      const engines = ["molecode", "molnextr", "molscribe"];
       const smilesList = [];
       const engineNames = [];
 

@@ -34,6 +34,7 @@ from app.schemas.healthcheck import HealthCheck
 from app.schemas.error import BadRequestModel, ErrorResponse, NotFoundModel
 from app.modules.ocsr_wrapper import process_chemical_structure, save_uploaded_image
 from app.modules.depiction import generate_depiction
+from app.modules.ocsr_wrapper import _get_recognizer,_get_detector
 from app.config import SEGMENTS_DIR, IMAGES_DIR
 
 # Create a router for the OCSR endpoints
@@ -48,40 +49,6 @@ router = APIRouter(
         422: {"description": "Unprocessable Entity", "model": ErrorResponse},
     },
 )
-
-_DETECTOR = None
-_RECOGNIZER = None
-
-
-def _get_detector():
-    global _DETECTOR
-    if _DETECTOR is None:
-        # Ultralytics + MolScribe both print startup chatter to stdout.
-        # stdout is our JSON channel — redirect any library noise to
-        # stderr so the parent only ever reads JSON lines.
-        with contextlib.redirect_stdout(sys.stderr):
-            from ultralytics import YOLO
-            from modelscope import snapshot_download
-            ckpt = snapshot_download(
-                repo_id="UniParser/MolDetv2",
-                allow_file_pattern="moldet_v2_yolo11n_960_doc.pt",
-            )
-            _DETECTOR = YOLO(ckpt+os.sep+"moldet_v2_yolo11n_960_doc.pt")
-    return _DETECTOR
-
-
-def _get_recognizer():
-    global _RECOGNIZER
-    if _RECOGNIZER is None:
-        with contextlib.redirect_stdout(sys.stderr):
-            from molscribe import MolScribe
-            from modelscope import snapshot_download
-            ckpt = snapshot_download(
-                repo_id="polyai/MolScribe",
-                allow_file_pattern="swin_base_char_aux_1m.pth",
-            )
-            _RECOGNIZER = MolScribe(ckpt+os.sep+"swin_base_char_aux_1m.pth", device=None)
-    return _RECOGNIZER
 
 
 @router.get(
@@ -130,5 +97,3 @@ def _recognize_batch(image_paths: list[str]) -> dict:
         "smiles": [o.get("smiles", "") for o in outs],
         "confidence": [float(o.get("confidence", 0.0) or 0.0) for o in outs],
     }
-
-
