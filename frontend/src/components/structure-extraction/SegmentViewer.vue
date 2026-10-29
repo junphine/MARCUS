@@ -340,23 +340,23 @@
                   </div>
                 </div>
 
-                <!-- MolNexTR Result Card -->
-                <div class="engine-result-card" :class="{ 'result-selected': selectedEngine === 'molnextr' }">
-                  <div class="engine-header molnextr">
+                <!-- MolParser Result Card -->
+                <div class="engine-result-card" :class="{ 'result-selected': selectedEngine === 'molparser' }">
+                  <div class="engine-header molparser">
                     <div class="engine-icon-container">
                       <vue-feather type="cpu" class="engine-icon"></vue-feather>
                     </div>
-                    <h4 class="engine-name">MolNexTR</h4>
+                    <h4 class="engine-name">MolParser</h4>
                   </div>
                   <div class="engine-content">
                     <!-- Structure visualization -->
                     <div class="structure-preview">
-                      <img v-if="molnextrResult && molnextrResult.svg"
-                        :src="'data:image/svg+xml;utf8,' + encodeURIComponent(molnextrResult.svg)" class="result-image"
-                        alt="MolNexTR result" />
-                      <div v-else-if="molnextrResult && molnextrResult.error" class="error-result">
+                      <img v-if="molparserResult && molparserResult.svg"
+                        :src="'data:image/svg+xml;utf8,' + encodeURIComponent(molparserResult.svg)" class="result-image"
+                        alt="MolParser result" />
+                      <div v-else-if="molparserResult && molparserResult.error" class="error-result">
                         <vue-feather type="alert-circle" class="error-icon"></vue-feather>
-                        <p>{{ molnextrResult.error }}</p>
+                        <p>{{ molparserResult.error }}</p>
                       </div>
                       <div v-else class="loading-structure">
                         <vue-feather type="loader" class="loading-icon spin"></vue-feather>
@@ -364,21 +364,21 @@
                     </div>
 
                     <!-- SMILES data -->
-                    <div v-if="molnextrResult && molnextrResult.smiles" class="smiles-data">
+                    <div v-if="molparserResult && molparserResult.smiles" class="smiles-data">
                       <div class="smiles-label">SMILES:</div>
-                      <div class="smiles-value">{{ truncateText(molnextrResult.smiles, 20) }}</div>
-                      <button class="copy-btn" @click="copyEngineSmiles(molnextrResult.smiles)" title="Copy SMILES">
+                      <div class="smiles-value">{{ truncateText(molparserResult.smiles, 20) }}</div>
+                      <button class="copy-btn" @click="copyEngineSmiles(molparserResult.smiles)" title="Copy SMILES">
                         <vue-feather type="copy" size="14"></vue-feather>
                       </button>
                     </div>
 
                     <!-- Processing time -->
-                    <div v-if="molnextrResult && molnextrResult.processingTime" class="engine-stats">
+                    <div v-if="molparserResult && molparserResult.processingTime" class="engine-stats">
                       <div class="stat-item">
                         <span class="stat-label">Processing Time:</span>
-                        <span class="stat-value">{{ molnextrResult.processingTime }}</span>
+                        <span class="stat-value">{{ molparserResult.processingTime }}</span>
                       </div>
-                      <div class="stat-item coordinates-badge" v-if="molnextrResult.molfile">
+                      <div class="stat-item coordinates-badge" v-if="molparserResult.molfile">
                         <span class="coordinate-label">
                           <vue-feather type="map-pin" size="12" class="coordinate-icon"></vue-feather>
                           Coordinates Available
@@ -387,11 +387,11 @@
                     </div>
 
                     <!-- Selection button -->
-                    <div v-if="molnextrResult && molnextrResult.smiles && !molnextrResult.error"
+                    <div v-if="molparserResult && molparserResult.smiles && !molparserResult.error"
                       class="selection-actions">
-                      <button class="select-prediction-btn" :class="{ 'active': selectedEngine === 'molnextr' }"
-                        @click="selectPrediction('molnextr')">
-                        <template v-if="selectedEngine === 'molnextr'">
+                      <button class="select-prediction-btn" :class="{ 'active': selectedEngine === 'molparser' }"
+                        @click="selectPrediction('molparser')">
+                        <template v-if="selectedEngine === 'molparser'">
                           <vue-feather type="check-circle" size="16" class="btn-icon"></vue-feather>
                           <span>Selected</span>
                         </template>
@@ -651,7 +651,7 @@ export default {
       comparisonMode: false,
       isComparing: false,
       decimerResult: null,
-      molnextrResult: null,
+      molparserResult: null,
       molscribeResult: null,
       isFullscreen: false,
       showContextView: false,
@@ -673,7 +673,7 @@ export default {
       hasIdenticalResults: false,
       findingMCS: false, // Property for MCS finding
       // New properties for engine selection
-      selectedEngine: null, // Will store 'molecode', 'molnextr', or 'molscribe'
+      selectedEngine: null, // Will store 'molecode', 'molparser', or 'molscribe'
       // New property to enable/disable auto analysis
       autoAnalysisEnabled: true,
       // Structure editor modal state
@@ -693,7 +693,7 @@ export default {
 
       const engine = this.displayedStructure.engine.toLowerCase()
       if (engine.includes('molecode')) return 'decimer-tag'
-      if (engine.includes('molnextr')) return 'molnextr-tag'
+      if (engine.includes('molparser')) return 'molparser-tag'
       if (engine.includes('molscribe')) return 'molscribe-tag'
 
       return ''
@@ -715,20 +715,20 @@ export default {
 
       // Otherwise, use coordinates if:
       // 1. We have a molfile
-      // 2. The engine is MolNexTR or MolScribe
+      // 2. The engine is MolParser or MolScribe
       return !!this.displayedStructure.molfile &&
-        (this.displayedStructure.engine === 'molnextr' ||
+        (this.displayedStructure.engine === 'molparser' ||
           this.displayedStructure.engine === 'molscribe');
     },
     // Check if all engines have loaded (either with success or error)
     allEnginesLoaded() {
-      return this.decimerResult && this.molnextrResult && this.molscribeResult;
+      return this.decimerResult && this.molparserResult && this.molscribeResult;
     },
     // Count engines with valid results
     validEngineCount() {
       let count = 0;
       if (this.decimerResult?.smiles && !this.decimerResult.error) count++;
-      if (this.molnextrResult?.smiles && !this.molnextrResult.error) count++;
+      if (this.molparserResult?.smiles && !this.molparserResult.error) count++;
       if (this.molscribeResult?.smiles && !this.molscribeResult.error) count++;
       return count;
     },
@@ -809,7 +809,7 @@ export default {
       this.comparisonMode = false;
       this.isComparing = false;
       this.decimerResult = null;
-      this.molnextrResult = null;
+      this.molparserResult = null;
       this.molscribeResult = null;
       this.showContextView = false;
       this.contextImageUrl = null;
@@ -850,7 +850,7 @@ export default {
       // Get valid SMILES strings
       const validSmiles = [];
       if (this.decimerResult?.smiles) validSmiles.push({ engine: 'molecode', smiles: this.decimerResult.smiles });
-      if (this.molnextrResult?.smiles) validSmiles.push({ engine: 'molnextr', smiles: this.molnextrResult.smiles });
+      if (this.molparserResult?.smiles) validSmiles.push({ engine: 'molparser', smiles: this.molparserResult.smiles });
       if (this.molscribeResult?.smiles) validSmiles.push({ engine: 'molscribe', smiles: this.molscribeResult.smiles });
 
       // Need at least 2 engines with SMILES to compare
@@ -892,19 +892,19 @@ export default {
       if (!this.allEnginesLoaded || this.isComparing) return;
 
       try {
-        // Update MolNexTR result
-        if (this.molnextrResult?.smiles && this.molnextrResult?.molfile) {
+        // Update MolParser result
+        if (this.molparserResult?.smiles && this.molparserResult?.molfile) {
           const useCoords = this.useCoordinatesForDisplay;
           const depictionOptions = {
             engine: 'cdk',
-            smiles: this.molnextrResult.smiles,
-            molfile: useCoords ? this.molnextrResult.molfile : null,
+            smiles: this.molparserResult.smiles,
+            molfile: useCoords ? this.molparserResult.molfile : null,
             useMolfileDirectly: useCoords,
             format: 'svg'
           };
 
           const svg = await depictionService.generateDepiction(depictionOptions);
-          this.molnextrResult.svg = svg;
+          this.molparserResult.svg = svg;
         }
 
         // Update MolScribe result
@@ -1124,7 +1124,7 @@ export default {
 
       // Reset results
       this.decimerResult = null;
-      this.molnextrResult = null;
+      this.molparserResult = null;
       this.molscribeResult = null;
 
       // Reset similarity metrics
@@ -1143,7 +1143,7 @@ export default {
         // Process all engines in parallel
         await Promise.all([
           this.processEngine('molecode', imagePath),
-          this.processEngine('molnextr', imagePath),
+          this.processEngine('molparser', imagePath),
           this.processEngine('molscribe', imagePath)
         ]);
 
@@ -1211,8 +1211,8 @@ export default {
 
         if (engine === 'molecode') {
           this.decimerResult = result;
-        } else if (engine === 'molnextr') {
-          this.molnextrResult = result;
+        } else if (engine === 'molparser') {
+          this.molparserResult = result;
         } else if (engine === 'molscribe') {
           this.molscribeResult = result;
         }
@@ -1234,8 +1234,8 @@ export default {
 
         if (engine === 'molecode') {
           this.decimerResult = errorResult;
-        } else if (engine === 'molnextr') {
-          this.molnextrResult = errorResult;
+        } else if (engine === 'molparser') {
+          this.molparserResult = errorResult;
         } else if (engine === 'molscribe') {
           this.molscribeResult = errorResult;
         }
@@ -1406,7 +1406,7 @@ export default {
         }
 
         // Define the engines we want to compare
-        const engines = ['molecode', 'molnextr', 'molscribe'];
+        const engines = ['molecode', 'molparser', 'molscribe'];
         const smilesList = [];
         const engineNames = [];
 
@@ -1416,9 +1416,9 @@ export default {
           engineNames.push(engines[0]); // molecode
         }
 
-        if (this.molnextrResult && this.molnextrResult.smiles) {
-          smilesList.push(this.molnextrResult.smiles);
-          engineNames.push(engines[1]); // molnextr
+        if (this.molparserResult && this.molparserResult.smiles) {
+          smilesList.push(this.molparserResult.smiles);
+          engineNames.push(engines[1]); // molparser
         }
 
         if (this.molscribeResult && this.molscribeResult.smiles) {
@@ -1487,11 +1487,11 @@ export default {
           });
         }
 
-        if (this.molnextrResult?.smiles && !this.molnextrResult.error) {
+        if (this.molparserResult?.smiles && !this.molparserResult.error) {
           validResults.push({
-            engine: 'molnextr',
-            smiles: this.molnextrResult.smiles,
-            molfile: this.molnextrResult.molfile
+            engine: 'molparser',
+            smiles: this.molparserResult.smiles,
+            molfile: this.molparserResult.molfile
           });
         }
 
@@ -1572,8 +1572,8 @@ export default {
             // Update the appropriate result based on engine
             if (result.engine === 'decimer' && this.decimerResult) {
               this.decimerResult.svg = svgResult;
-            } else if (result.engine === 'molnextr' && this.molnextrResult) {
-              this.molnextrResult.svg = svgResult;
+            } else if (result.engine === 'molparser' && this.molparserResult) {
+              this.molparserResult.svg = svgResult;
             } else if (result.engine === 'molscribe' && this.molscribeResult) {
               this.molscribeResult.svg = svgResult;
             }
@@ -1633,7 +1633,7 @@ export default {
     getEngineDisplayName(engine) {
       const displayNames = {
         'molecode': 'MoleCode',
-        'molnextr': 'MolNexTR',
+        'molparser': 'MolParser',
         'molscribe': 'MolScribe'
       };
       return displayNames[engine] || engine;
@@ -1647,8 +1647,8 @@ export default {
       // Get the selected result object
       if (this.selectedEngine === 'decimer' && this.decimerResult) {
         selectedResult = this.decimerResult;
-      } else if (this.selectedEngine === 'molnextr' && this.molnextrResult) {
-        selectedResult = this.molnextrResult;
+      } else if (this.selectedEngine === 'molparser' && this.molparserResult) {
+        selectedResult = this.molparserResult;
       } else if (this.selectedEngine === 'molscribe' && this.molscribeResult) {
         selectedResult = this.molscribeResult;
       }
@@ -2320,7 +2320,7 @@ export default {
                         border-color: rgba(249, 115, 22, 0.3);
                       }
 
-                      &.molnextr-tag {
+                      &.molparser-tag {
                         background: linear-gradient(135deg, #a7f3d0 0%, #6ee7b7 100%);
                         border-color: rgba(16, 185, 129, 0.3);
                       }
@@ -2380,7 +2380,7 @@ export default {
                           border: 1px solid rgba(249, 115, 22, 0.3);
                         }
 
-                        &.molnextr-tag {
+                        &.molparser-tag {
                           background: rgba(16, 185, 129, 0.1);
                           color: #059669;
                           border: 1px solid rgba(16, 185, 129, 0.3);
@@ -2867,7 +2867,7 @@ export default {
                     border: 1px solid rgba(249, 115, 22, 0.3);
                   }
 
-                  &.molnextr-tag {
+                  &.molparser-tag {
                     background-color: rgba(7, 150, 112, 0.1);
                     color: #05742c;
                     border: 1px solid rgba(14, 165, 233, 0.3);
@@ -3371,7 +3371,7 @@ export default {
                     }
                   }
 
-                  &.molnextr {
+                  &.molparser {
                     background: linear-gradient(135deg, rgba(12, 255, 158, 0.15) 0%, rgba(14, 233, 182, 0.25) 100%);
                     border-bottom: 2px solid rgba(14, 233, 171, 0.4);
 

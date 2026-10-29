@@ -205,7 +205,7 @@ def generate_depiction(
 
         # For CDK engine
         if molfile and use_molfile_directly or smiles is None:
-            # Use molfile directly with CDK - this is the preferred method for MolNexTR output
+            # Use molfile directly with CDK - this is the preferred method for MolParser/MolScribe output
             try:
                 # Directly read molfile as CDK molecule
                 cdk_molecule = read_molfile_as_cdk_mol(molfile)

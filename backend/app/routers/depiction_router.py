@@ -275,7 +275,7 @@ async def depict_from_ocsr(
     """
     Generate depictions from OCSR (Optical Chemical Structure Recognition) results.
 
-    This endpoint is designed to work with the output from DECIMER or MolNexTR.
+    This endpoint is designed to work with the output from DECIMER or MolParser.
     If use_molfile is True and molfile is provided, it will use the molfile for depiction.
     Otherwise, it will use the SMILES string.
 

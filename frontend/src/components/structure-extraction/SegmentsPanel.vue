@@ -199,7 +199,7 @@ export default {
       imageSuccess: {},
       selectedSegment: null,
       isProcessingSegment: false,
-      comparisonEngines: ['molecode', 'molnextr', 'molscribe'],
+      comparisonEngines: ['molecode', 'molparser', 'molscribe'],
       showDebugInfo: process.env.NODE_ENV === 'development' || false,
       // Track processedStructuresMap by filename
       processedStructuresMap: new Map(),
@@ -401,10 +401,10 @@ export default {
     updateModelOptions(options) {
       this.modelOptions = { ...this.modelOptions, ...options }
 
-      // Auto-enable includeMolfile for molnextr and molscribe engines
+      // Auto-enable includeMolfile for molparser and molscribe engines
       if (options.model) {
         const engine = options.model
-        if (engine === 'molnextr' || engine === 'molscribe') {
+        if (engine === 'molparser' || engine === 'molscribe') {
           this.modelOptions.includeMolfile = true
         }
       }
@@ -596,7 +596,7 @@ export default {
           engine: this.selectedModel,
           handDrawn: this.modelOptions.handDrawn,
           includeMolfile: this.modelOptions.includeMolfile ||
-            (this.selectedModel === 'molnextr' || this.selectedModel === 'molscribe')
+            (this.selectedModel === 'molparser' || this.selectedModel === 'molscribe')
         }
 
         // Process the segment with OCSR service
@@ -620,7 +620,7 @@ export default {
           name: segment.filename, // IMPORTANT: This is used for matching
           pdfId: pdfId,
           useCoordinates: options.includeMolfile &&
-            (options.engine === 'molnextr' || options.engine === 'molscribe'),
+            (options.engine === 'molparser' || options.engine === 'molscribe'),
           processId: processId,
           timestamp: new Date().toISOString()
         }
@@ -824,7 +824,7 @@ export default {
 
       // Check if we have molfile data and if it's a coordinate-capable engine
       const hasValidMolfile = !!structure.molfile
-      const isCoordinateCapableEngine = structure.engine === 'molnextr' || structure.engine === 'molscribe'
+      const isCoordinateCapableEngine = structure.engine === 'molparser' || structure.engine === 'molscribe'
       
       if (!hasValidMolfile || !isCoordinateCapableEngine) {
         return false
@@ -861,7 +861,7 @@ export default {
 
       const displayNames = {
         'molecode': 'MolCode',
-        'molnextr': 'MolNexTR',
+        'molparser': 'MolParser',
         'molscribe': 'MolScribe'
       };
 

@@ -9,7 +9,7 @@ const depictionService = {
    * @param {Object} options - Depiction options
    * @param {string} options.smiles - SMILES string (optional if molfile is provided)
    * @param {string} options.molfile - Molfile string (optional if SMILES is provided)
-   * @param {boolean} options.useMolfileDirectly - Whether to use molfile directly (for MolNexTR output)
+   * @param {boolean} options.useMolfileDirectly - Whether to use molfile directly (for MolParser output)
    * @param {number} options.width - Width of the depiction in pixels
    * @param {number} options.height - Height of the depiction in pixels
    * @param {number} options.rotate - Rotation angle in degrees

@@ -65,7 +65,7 @@
           </div>
           <h3 class="feature-title">Optical Chemical Structure Recognition</h3>
           <p class="feature-description">
-            Convert visual chemical structures into machine-readable formats (SMILES, molfiles) using state-of-the-art OCSR engines including DECIMER, MolScribe and MolNexTR.
+            Convert visual chemical structures into machine-readable formats (SMILES, molfiles) using state-of-the-art OCSR engines including DECIMER, MolScribe and MolParser.
           </p>
           <div class="feature-footer">
             <button class="feature-link" @click="showOcsrInfo">
@@ -165,8 +165,8 @@
             <span class="tech-name">MolScribe</span>
           </div>
           <div class="tech-logo">
-            <span class="tech-img molnextr-logo"></span>
-            <span class="tech-name">MolNexTR</span>
+            <span class="tech-img molparser-logo"></span>
+            <span class="tech-name">MolParser</span>
           </div>
           <div class="tech-logo">
             <span class="tech-img openai-logo"></span>
@@ -740,7 +740,7 @@ export default {
           background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Ccircle cx='24' cy='24' r='20' fill='%233461ff'/%3E%3Cpath d='M20 18 L28 18 L32 28 L24 32 L16 28 Z' fill='none' stroke='white' stroke-width='2'/%3E%3Cpath d='M24 16 L24 32' stroke='white' stroke-width='2'/%3E%3Cpath d='M36 16 L32 20 L32 28' stroke='white' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
         }
         
-        &.molnextr-logo {
+        &.molparser-logo {
           background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Ccircle cx='24' cy='24' r='20' fill='%233461ff'/%3E%3Cpath d='M16 24 L24 16 L32 24 L24 32 Z' fill='white'/%3E%3C/svg%3E");
         }
         

@@ -995,7 +995,7 @@ export default {
     const depictionOptions = {
       smiles: structure.smiles,
       molfile: structure.molfile,
-      useMolfileDirectly: !!structure.molfile && (structure.engine === 'molnextr' || structure.engine === 'molscribe'),
+      useMolfileDirectly: !!structure.molfile && (structure.engine === 'molparser' || structure.engine === 'molscribe'),
       format: 'svg',
       width: 300,
       height: 300

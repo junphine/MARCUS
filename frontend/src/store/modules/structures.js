@@ -18,7 +18,7 @@ export default {
     segmentInfo: null, // Metadata about the segments
     processingOptions: {
       // Options for structure processing
-      engine: "molecode", // Default engine: 'molecode', 'molnextr', or 'molscribe'
+      engine: "molecode", // Default engine: 'molecode', 'molparser', or 'molscribe'
       handDrawn: false,
       includeMolfile: false,
     },
@@ -318,15 +318,15 @@ export default {
       // Update processing options
       if (options.model) {
         // Validate model/engine value
-        const validEngines = ["molecode", "molnextr", "molscribe"];
+        const validEngines = ["molecode", "molparser", "molscribe"];
         const engine = validEngines.includes(options.model)
           ? options.model
           : "molecode";
 
-        // Auto-enable includeMolfile for molnextr and molscribe engines
+        // Auto-enable includeMolfile for molparser and molscribe engines
         const includeMolfile =
           options.includeMolfile ||
-          engine === "molnextr" ||
+          engine === "molparser" ||
           engine === "molscribe";
 
         commit("SET_PROCESSING_OPTIONS", {
@@ -570,7 +570,7 @@ export default {
       }
 
       // Get engines to compare
-      const engines = ["molecode", "molnextr", "molscribe"];
+      const engines = ["molecode", "molparser", "molscribe"];
       const smilesList = [];
       const engineNames = [];
 

@@ -43,42 +43,42 @@
         </div>
       </div>
       
-      <!-- MolNexTR Model -->
+      <!-- MolParser Model -->
       <div 
         class="model-button"
         :class="{ 
-          active: modelValue === 'molnextr',
+          active: modelValue === 'molparser',
           disabled: disabled 
         }"
-        @click="selectModel('molnextr')"
+        @click="selectModel('molparser')"
         role="button"
         tabindex="0"
-        @keydown.enter="selectModel('molnextr')"
-        @keydown.space="selectModel('molnextr')"
+        @keydown.enter="selectModel('molparser')"
+        @keydown.space="selectModel('molparser')"
       >
         <input 
           type="radio" 
-          id="molnextr" 
+          id="molparser" 
           name="model" 
-          value="molnextr"
-          :checked="modelValue === 'molnextr'"
+          value="molparser"
+          :checked="modelValue === 'molparser'"
           :disabled="disabled"
           class="model-radio"
         />
         
-        <div class="model-icon molnextr-icon">
+        <div class="model-icon molparser-icon">
           <vue-feather type="grid" class="icon"></vue-feather>
         </div>
         
         <div class="model-content">
           <div class="model-name">
-            MolNexTR
+            MolParser
             <span class="info-icon">i</span>
           </div>
-          <div class="model-tooltip">ConvNext based Image-to-graph model with enhanced spatial understanding</div>
+          <div class="model-tooltip">End-to-end visual recognition model for molecular structures in the wild</div>
         </div>
       </div>
-      
+
       <!-- MolScribe Model -->
       <div 
         class="model-button"
@@ -135,8 +135,8 @@
         </div>
       </div>
       
-      <!-- MolNexTR & MolScribe Options -->
-      <div v-if="modelValue === 'molnextr' || modelValue === 'molscribe'" class="config-group">
+      <!-- MolParser & MolScribe Options -->
+      <div v-if="modelValue === 'molparser' || modelValue === 'molscribe'" class="config-group">
         <div class="toggle-option">
           <div class="toggle-switch" @click="toggleCoordinates">
             <div 
@@ -186,7 +186,7 @@ export default {
         this.handDrawn = false;
         this.includeCoordinates = false; // MoleCode doesn't use coordinates
       } else {
-        // For MolNexTR and MolScribe, default to using coordinates
+        // For MolParser and MolScribe, default to using coordinates
         this.includeCoordinates = true;
       }
       this.updateOptions();
@@ -210,7 +210,7 @@ export default {
       if (model === 'molecode') {
         this.includeCoordinates = false; // MoleCode doesn't support molfiles
       } else {
-        // Default to using coordinates for MolNexTR and MolScribe
+        // Default to using coordinates for MolParser and MolScribe
         this.includeCoordinates = true;
       }
       
@@ -356,7 +356,7 @@ export default {
         background: linear-gradient(135deg, #ff9500 0%, #ff7b00 100%);
       }
 
-      &.molnextr-icon {
+      &.molparser-icon {
         background: linear-gradient(135deg, #059669 0%, #047857 100%);
       }
 

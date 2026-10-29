@@ -203,12 +203,12 @@
                 <div class="icon-glow"></div>
               </div>
               <div class="publication-info">
-                <h4>MolNexTR: a generalized deep learning model for molecular image recognition</h4>
-                <p class="publication-authors">Chen, Y., Leung, C.T., Huang, Y. et al.</p>
-                <p class="publication-journal">J Cheminform 16, 141 (2024)</p>
-                <a href="https://doi.org/10.1186/s13321-024-00926-w" target="_blank" class="publication-link">
+                <h4>MolParser: End-to-end visual recognition of molecule structures in the wild</h4>
+                <p class="publication-authors">Fang, X., Wang, J., Cai, X. et al.</p>
+                <p class="publication-journal">ICCV (2025)</p>
+                <a href="https://arxiv.org/abs/2411.11098" target="_blank" class="publication-link">
                   <vue-feather type="external-link" size="14"></vue-feather>
-                  <span>doi.org/10.1186/s13321-024-00926-w</span>
+                  <span>arxiv.org/abs/2411.11098</span>
                 </a>
               </div>
             </div>

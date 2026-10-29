@@ -225,7 +225,7 @@
         
         const engineMap = {
           'molecode': 'MoleCode',
-          'molnextr': 'MolNexTR',
+          'molparser': 'MolParser',
           'molscribe': 'MolScribe'
         };
         

@@ -16,6 +16,7 @@ os.makedirs(IMAGES_DIR, exist_ok=True)
 
 
 _molscribe_model = None
+_molparser_model = None
 _DETECTOR = None
 _RECOGNIZER = None
 
@@ -51,22 +52,73 @@ def _get_recognizer():
     return _RECOGNIZER
 
 
-def get_molnextr_prediction(
+
+
+def init_molparser():
+    """
+    Initialize the MolParser model (singleton).
+
+    Returns:
+        MolParser: Initialized MolParser instance
+    """
+    global _molparser_model
+
+    if _molparser_model is not None:
+        return _molparser_model
+
+    try:
+        # Redirect library startup chatter away from stdout (JSON channel)
+        with contextlib.redirect_stdout(sys.stderr):
+            from molparser import MolParser
+
+            _molparser_model = MolParser()
+        return _molparser_model
+    except Exception as e:
+        raise RuntimeError(f"Failed to initialize MolParser model: {str(e)}")
+
+
+def _smiles_to_molfile(smiles: str) -> str:
+    """
+    Generate a molfile with 2D coordinates from a SMILES string using RDKit.
+
+    Args:
+        smiles: SMILES string
+
+    Returns:
+        Molfile string with 2D coordinates, or an empty string if the
+        SMILES cannot be parsed (e.g. extended/Markush notation).
+    """
+    if not smiles:
+        return ""
+    try:
+        from rdkit import Chem
+        from rdkit.Chem import AllChem
+
+        mol = Chem.MolFromSmiles(smiles)
+        if mol is None:
+            return ""
+        AllChem.Compute2DCoords(mol)
+        return Chem.MolToMolBlock(mol)
+    except Exception:
+        return ""
+
+
+def get_molparser_prediction(
     path: Union[str, Path],
-    data_type: Literal["smiles", "predicted_molfile", "both"] = "smiles",
+    data_type: Literal["smiles", "molfile", "both"] = "smiles",
 ) -> Union[Tuple[str, str], Tuple[str, str, str]]:
     """
-    Get predictions from MolNexTR model for a given image path.
+    Get predictions from the MolParser model for a given image path.
 
     Args:
         path: Path to the chemical structure image.
         data_type: Type of data to return. Options:
                    "smiles" - Return only SMILES string
-                   "predicted_molfile" - Return only predicted molfile
-                   "both" - Return both SMILES and predicted molfile
+                   "molfile" - Return only molfile (2D coordinates from SMILES)
+                   "both" - Return both SMILES and molfile
 
     Returns:
-        If data_type is "smiles" or "predicted_molfile":
+        If data_type is "smiles" or "molfile":
             A tuple containing (image_name, result_string)
         If data_type is "both":
             A tuple containing (image_name, smiles_string, molfile_string)
@@ -74,6 +126,7 @@ def get_molnextr_prediction(
     Raises:
         FileNotFoundError: If the specified path does not exist.
         ValueError: If an invalid data_type is provided.
+        RuntimeError: If the MolParser prediction fails.
     """
     path = Path(path)
     if not path.exists():
@@ -81,31 +134,29 @@ def get_molnextr_prediction(
 
     image_name = path.name
 
-    # Define prediction parameters based on data_type
-    get_smiles = data_type in ("smiles", "both")
-    get_molfile = data_type in ("predicted_molfile", "both")
+    if data_type not in ("smiles", "molfile", "both"):
+        raise ValueError("Invalid data_type. Choose 'smiles', 'molfile', or 'both'.")
 
-    if data_type not in ("smiles", "predicted_molfile", "both"):
-        raise ValueError(
-            "Invalid data_type. Choose 'smiles', 'predicted_molfile', or 'both'."
-        )
+    # Use the singleton MolParser instance to get predictions
+    parser = init_molparser()
+    try:
+        results = parser.parse_image(str(path), rec_only=True)
+    except Exception as e:
+        raise RuntimeError(f"Error in MolParser prediction: {str(e)}")
 
-    # Use the singleton implementation to get predictions
-    prediction = molnextr_get_predictions(
-        str(path), atoms_bonds=False, smiles=get_smiles, predicted_molfile=get_molfile
-    )
+    smiles = results[0].smi if results else ""
+
+    # MolParser outputs SMILES only; derive a molfile with 2D coordinates
+    get_molfile = data_type in ("molfile", "both")
+    molfile = _smiles_to_molfile(smiles) if get_molfile else ""
 
     # Return results based on data_type
     if data_type == "smiles":
-        return image_name, prediction.get("predicted_smiles", "")
-    elif data_type == "predicted_molfile":
-        return image_name, prediction.get("predicted_molfile", "")
+        return image_name, smiles
+    elif data_type == "molfile":
+        return image_name, molfile
     else:  # data_type == "both"
-        return (
-            image_name,
-            prediction.get("predicted_smiles", ""),
-            prediction.get("predicted_molfile", ""),
-        )
+        return image_name, smiles, molfile
 
 
 
@@ -179,18 +230,19 @@ def get_molscribe_prediction(
 
     # Get prediction
     try:
-        prediction = model.predict_image_file(str(path))
+        with torch.no_grad():
+            prediction = model.predict_image_file(str(path))
 
-        smiles = prediction.get("smiles", "")
-        molfile = prediction.get("molfile", "")
+            smiles = prediction.get("smiles", "")
+            molfile = prediction.get("molfile", "")
 
-        # Return results based on data_type
-        if data_type == "smiles":
-            return image_name, smiles
-        elif data_type == "molfile":
-            return image_name, molfile
-        else:  # data_type == "both"
-            return image_name, smiles, molfile
+            # Return results based on data_type
+            if data_type == "smiles":
+                return image_name, smiles
+            elif data_type == "molfile":
+                return image_name, molfile
+            else:  # data_type == "both"
+                return image_name, smiles, molfile
     except Exception as e:
         raise RuntimeError(f"Error in MolScribe prediction: {str(e)}")
 
@@ -223,7 +275,7 @@ def save_uploaded_image(file_content: bytes, filename: str) -> str:
 
 def process_chemical_structure(
     file_path: str,
-    engine: Literal["molecode", "molnextr", "molscribe"] = "molecode",
+    engine: Literal["molecode", "molparser", "molscribe"] = "molecode",
     output_type: Literal["smiles", "molfile", "both"] = "smiles",
     hand_drawn: bool = False,
 ) -> Dict[str, Any]:
@@ -274,19 +326,19 @@ def process_chemical_structure(
                     "hardware": f"CPU (PyTorch)",
                 }
 
-        # Original MolNexTR processing
-        elif engine == "molnextr":
-            # Import device info if available
+        # MolParser processing
+        elif engine == "molparser":
+            # Report hardware info if available
             try:
-                from MolNexTR import MolNexTRSingleton
-                device, device_name = MolNexTRSingleton.get_device()
-                hardware_info = device_name
-            except:
+                if torch.cuda.is_available():
+                    hardware_info = f"GPU: {torch.cuda.get_device_name(0)}"
+                else:
+                    hardware_info = "CPU (PyTorch)"
+            except Exception:
                 hardware_info = "Unknown"
-            from MolNexTR import get_predictions as molnextr_get_predictions
 
             if output_type == "smiles":
-                image_name, smiles = get_molnextr_prediction(
+                image_name, smiles = get_molparser_prediction(
                     file_path, data_type="smiles"
                 )
                 return {
@@ -296,8 +348,8 @@ def process_chemical_structure(
                     "hardware": hardware_info,
                 }
             elif output_type == "molfile":
-                image_name, molfile = get_molnextr_prediction(
-                    file_path, data_type="predicted_molfile"
+                image_name, molfile = get_molparser_prediction(
+                    file_path, data_type="molfile"
                 )
                 return {
                     "image_name": image_name,
@@ -306,7 +358,7 @@ def process_chemical_structure(
                     "hardware": hardware_info,
                 }
             else:  # output_type == "both"
-                image_name, smiles, molfile = get_molnextr_prediction(
+                image_name, smiles, molfile = get_molparser_prediction(
                     file_path, data_type="both"
                 )
                 return {
@@ -329,7 +381,7 @@ def process_chemical_structure(
 
         else:
             raise ValueError(
-                f"Unsupported engine: {engine}. Choose 'molecode', 'molnextr', or 'molscribe'."
+                f"Unsupported engine: {engine}. Choose 'molecode', 'molparser', or 'molscribe'."
             )
 
     except Exception as e:

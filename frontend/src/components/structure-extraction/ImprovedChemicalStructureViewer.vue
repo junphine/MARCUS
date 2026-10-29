@@ -47,7 +47,7 @@ export default {
       type: String,
       default: ''
     },
-    // Original source engine (e.g., 'molecode', 'molnextr', 'molscribe')
+    // Original source engine (e.g., 'molecode', 'molparser', 'molscribe')
     sourceEngine: {
       type: String,
       default: ''
@@ -81,10 +81,10 @@ export default {
     shouldUseMolfile() {
       // Use molfile if available AND either:
       // 1. useCoordinates prop is true (explicit request to use coordinates)
-      // 2. The source is molnextr or molscribe AND there's no explicit request not to use coordinates
+      // 2. The source is molparser or molscribe AND there's no explicit request not to use coordinates
       return !!this.molfile &&
         (this.useCoordinates === true ||
-          ((this.sourceEngine === 'molnextr' || this.sourceEngine === 'molscribe') &&
+          ((this.sourceEngine === 'molparser' || this.sourceEngine === 'molscribe') &&
             this.useCoordinates !== false))
     },
     sanitizedSvg() {
@@ -96,14 +96,14 @@ export default {
     // Added computed property for engine class
     engineClass() {
       if (this.sourceEngine === 'molecode') return 'decimer-tag';
-      if (this.sourceEngine === 'molnextr') return 'molnextr-tag';
+      if (this.sourceEngine === 'molparser') return 'molparser-tag';
       if (this.sourceEngine === 'molscribe') return 'molscribe-tag';
       return '';
     },
     // Added computed property for engine label
     engineLabel() {
       if (this.sourceEngine === 'molecode') return 'MoleCode';
-      if (this.sourceEngine === 'molnextr') return 'MolNexTR';
+      if (this.sourceEngine === 'molparser') return 'MolParser';
       if (this.sourceEngine === 'molscribe') return 'MolScribe';
       return this.sourceEngine || 'Unknown engine';
     }
@@ -510,7 +510,7 @@ export default {
           border: 1px solid rgba(255, 149, 0, 0.2);
         }
 
-        .molnextr-tag {
+        .molparser-tag {
           background-color: rgba(0, 122, 255, 0.1);
           color: #007aff;
           border: 1px solid rgba(0, 122, 255, 0.2);

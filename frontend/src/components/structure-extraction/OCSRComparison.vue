@@ -152,7 +152,7 @@ export default {
       useCoordinatesForDepiction: true, // Default to using coordinates for better depiction
       results: [
         { engine: 'molecode', smiles: '', molfile: null, error: null, processingTime: null, useCoordinates: false },
-        { engine: 'molnextr', smiles: '', molfile: null, error: null, processingTime: null, useCoordinates: true },
+        { engine: 'molparser', smiles: '', molfile: null, error: null, processingTime: null, useCoordinates: true },
         { engine: 'molscribe', smiles: '', molfile: null, error: null, processingTime: null, useCoordinates: true }
       ],
       mcsResult: null,
@@ -176,13 +176,13 @@ export default {
     engineClass(engine) {
       return {
         'molecode-engine': engine === 'molecode',
-        'molnextr-engine': engine === 'molnextr',
+        'molparser-engine': engine === 'molparser',
         'molscribe-engine': engine === 'molscribe'
       };
     },
     engineIcon(engine) {
       if (engine === 'molecode') return 'llm';
-      if (engine === 'molnextr') return 'grid';
+      if (engine === 'molparser') return 'grid';
       if (engine === 'molscribe') return 'edit-3';
       return 'box';
     },
@@ -320,7 +320,7 @@ export default {
       
       try {
         // Process segment with all three engines in parallel
-        const engines = ['molecode', 'molnextr', 'molscribe'];
+        const engines = ['molecode', 'molparser', 'molscribe'];
         const processPromises = engines.map(engine => this.processWithEngine(engine));
         
         await Promise.all(processPromises);
@@ -345,7 +345,7 @@ export default {
         
         console.log(`Processing segment with ${engine} engine: ${imagePath}`);
         
-        // Always include molfile for MolNexTR and MolScribe for comparison purposes
+        // Always include molfile for MolParser and MolScribe for comparison purposes
         const includeMolfile = engine !== 'molecode';
         
         // Process the segment using ocsrService
@@ -422,7 +422,7 @@ export default {
     useCoordinatesForDepiction(newValue) {
       // Update the useCoordinates property of each result when the global setting changes
       this.results.forEach(result => {
-        // Only change for MolNexTR and MolScribe
+        // Only change for MolParser and MolScribe
         if (result.engine !== 'molecode') {
           result.useCoordinates = newValue;
         }
@@ -556,7 +556,7 @@ export default {
           }
         }
         
-        &.molnextr-engine {
+        &.molparser-engine {
           background-color: rgba(0, 122, 255, 0.1);
           
           .engine-icon {

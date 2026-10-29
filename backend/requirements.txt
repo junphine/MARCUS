@@ -42,6 +42,7 @@ OpenNMT-py==2.2.0
 efficientnet>=1.1.1
 transformers>=4.49.0
 huggingface-hub>=0.11.0
+modelscope
 #tensorboardX
 scipy
 
