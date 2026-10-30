@@ -381,22 +381,21 @@ processSegments: async (segments, options = {}) => {
       console.log(`[${batchId}] Using image path: ${imagePath}`);
       
       try {
-        // Use the combined API endpoint that includes depiction
-        console.log(`[${batchId}] Calling generateWithDepiction for ${segment.id} - ${filename}`);
-        const response = await ocsrService.generateWithDepiction(null, imagePath, {
+        // Use the generate_both endpoint (SMILES + molfile). The depiction is
+        // generated on demand by the viewer component via /depiction/generate,
+        // so no depiction is requested from the backend here.
+        console.log(`[${batchId}] Calling generateBoth for ${segment.id} - ${filename}`);
+        const response = await ocsrService.generateBoth(null, imagePath, {
           engine: options.engine,
-          handDrawn: options.handDrawn || false,
-          includeMolfile: options.includeMolfile || false,
-          depictEngine: 'rdkit',  // Use RDKit as default
-          depictFormat: 'svg'
+          handDrawn: options.handDrawn || false
         });
-        
-        console.log(`[${batchId}] Got response for ${segment.id} - ${filename}:`, 
+
+        console.log(`[${batchId}] Got response for ${segment.id} - ${filename}:`,
           response.smiles ? `SMILES found (${response.smiles.length} chars)` : 'No SMILES');
-        
+
         // Create structure object with the correct segmentId AND PDF ID
         const structure = {
-          segmentId: segment.id, 
+          segmentId: segment.id,
           originalSegmentId: segment.id,
           segmentUrl: segment.imageUrl || segment.path,
           filename: filename,
@@ -408,55 +407,26 @@ processSegments: async (segments, options = {}) => {
           pageIndex: pageNum,
           segmentIndex: segmentNum,
           uniqueKey: `pdf-${pdfId}-page-${pageNum}-segment-${segmentNum}`,
-          depiction: response.depiction || null,
           useCoordinates: useCoordinates,
           processingTime: new Date().toISOString()
         };
-        
+
         results.push(structure);
-        
+
       } catch (apiError) {
         console.error(`[${batchId}] API error processing segment ${segment.id} - ${filename}:`, apiError);
-        
-        // Try fallback approach
-        console.log(`[${batchId}] Trying fallback with generateBoth for ${segment.id} - ${filename}`);
-        try {
-          const fallbackResponse = await ocsrService.generateBoth(null, imagePath, options);
-          
-          // Add to results with full identifiers and PDF ID
-          results.push({
-            segmentId: segment.id,
-            originalSegmentId: segment.id,
-            segmentUrl: segment.imageUrl || segment.path,
-            filename: filename,
-            smiles: fallbackResponse.smiles || '',
-            molfile: fallbackResponse.molfile || null,
-            engine: options.engine,
-            name: filename,
-            pdfId: pdfId, // Store the PDF ID
-            pageIndex: pageNum,
-            segmentIndex: segmentNum,
-            uniqueKey: `pdf-${pdfId}-page-${pageNum}-segment-${segmentNum}`,
-            useCoordinates: useCoordinates,
-            fromFallback: true,
-            processingTime: new Date().toISOString()
-          });
-        } catch (fallbackError) {
-          // If even the fallback approach fails, add error result
-          console.error(`[${batchId}] Fallback also failed for segment ${segment.id} - ${filename}:`, fallbackError);
-          results.push({
-            segmentId: segment.id,
-            segmentUrl: segment.imageUrl || segment.path,
-            filename: filename,
-            name: filename,
-            pdfId: pdfId, // Store the PDF ID
-            pageIndex: pageNum,
-            segmentIndex: segmentNum,
-            uniqueKey: `pdf-${pdfId}-page-${pageNum}-segment-${segmentNum}`,
-            error: apiError.message || 'API processing failed',
-            processingTime: new Date().toISOString()
-          });
-        }
+        results.push({
+          segmentId: segment.id,
+          segmentUrl: segment.imageUrl || segment.path,
+          filename: filename,
+          name: filename,
+          pdfId: pdfId, // Store the PDF ID
+          pageIndex: pageNum,
+          segmentIndex: segmentNum,
+          uniqueKey: `pdf-${pdfId}-page-${pageNum}-segment-${segmentNum}`,
+          error: apiError.message || 'API processing failed',
+          processingTime: new Date().toISOString()
+        });
       }
     } catch (error) {
       console.error(`[${batchId}] Error processing segment ${segment ? segment.id : 'unknown'}:`, error);

@@ -6,7 +6,6 @@ from pathlib import Path
 import contextlib
 import json
 import sys
-import traceback
 from fastapi import HTTPException, status
 from app.config import UPLOAD_DIR
 

@@ -139,18 +139,20 @@
       </div>
     </div>
 
-    <!-- Detailed segment viewer modal -->
-    <div v-if="selectedSegment" class="segment-modal-backdrop" @click.self="closeDetailView">
-      <div class="segment-modal">
-        <SegmentViewer :segment="selectedSegment" :processed-structure="getStructureForSegment(selectedSegment)"
-          :is-processing="isProcessingSegment" :is-selected="isSegmentSelected(selectedSegment.id)"
-          @close="closeDetailView" @process-segment="processSingleSegment" @run-comparison="runComparisonForSegment"
-          @error="handleSegmentViewerError" @copy-complete="handleCopyComplete"
-          @download-complete="handleDownloadComplete" @notification="handleNotification"
-          @toggle-selection="toggleSegmentSelection(selectedSegment.id)"
-          @prediction-selected="handlePredictionSelected" />
+    <!-- Detailed segment viewer modal (teleported to body so it overlays the entire window) -->
+    <Teleport to="body">
+      <div v-if="selectedSegment" class="segment-modal-backdrop" @click.self="closeDetailView">
+        <div class="segment-modal">
+          <SegmentViewer :segment="selectedSegment" :processed-structure="getStructureForSegment(selectedSegment)"
+            :is-processing="isProcessingSegment" :is-selected="isSegmentSelected(selectedSegment.id)"
+            @close="closeDetailView" @process-segment="processSingleSegment" @run-comparison="runComparisonForSegment"
+            @error="handleSegmentViewerError" @copy-complete="handleCopyComplete"
+            @download-complete="handleDownloadComplete" @notification="handleNotification"
+            @toggle-selection="toggleSegmentSelection(selectedSegment.id)"
+            @prediction-selected="handlePredictionSelected" />
+        </div>
       </div>
-    </div>
+    </Teleport>
   </div>
 </template>
 
@@ -1579,52 +1581,52 @@ export default {
       }
     }
   }
+}
 
-  /* Enhanced modal styling */
-  .segment-modal-backdrop {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(0, 0, 0, 0.75);
-    z-index: 1000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 1.5rem;
-    backdrop-filter: blur(8px);
-    animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+/* Enhanced modal styling (top-level: the modal is teleported to <body>) */
+.segment-modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.75);
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  backdrop-filter: blur(8px);
+  animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 
-    .segment-modal {
-      background: linear-gradient(145deg, #f8fafc 0%, #eef2ff 100%);
-      border-radius: 24px;
-      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.1), 0 8px 16px rgba(0, 0, 0, 0.06);
-      width: 100%;
-      max-width: 1100px;
-      max-height: 90vh;
-      overflow-y: auto;
-      padding: 1.75rem;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      animation: modalSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  .segment-modal {
+    background: linear-gradient(145deg, #f8fafc 0%, #eef2ff 100%);
+    border-radius: 24px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.1), 0 8px 16px rgba(0, 0, 0, 0.06);
+    width: 100%;
+    max-width: 1100px;
+    max-height: 90vh;
+    overflow-y: auto;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    animation: modalSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 
-      /* Customize modal scrollbar */
-      &::-webkit-scrollbar {
-        width: 8px;
-      }
+    /* Customize modal scrollbar */
+    &::-webkit-scrollbar {
+      width: 8px;
+    }
 
-      &::-webkit-scrollbar-track {
-        background: rgba(241, 245, 249, 0.6);
-        border-radius: 8px;
-      }
+    &::-webkit-scrollbar-track {
+      background: rgba(241, 245, 249, 0.6);
+      border-radius: 8px;
+    }
 
-      &::-webkit-scrollbar-thumb {
-        background: rgba(148, 163, 184, 0.5);
-        border-radius: 8px;
+    &::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.5);
+      border-radius: 8px;
 
-        &:hover {
-          background: rgba(100, 116, 139, 0.6);
-        }
+      &:hover {
+        background: rgba(100, 116, 139, 0.6);
       }
     }
   }
@@ -1692,13 +1694,13 @@ export default {
         }
       }
     }
+  }
 
-    .segment-modal-backdrop {
-      padding: 1rem;
+  .segment-modal-backdrop {
+    padding: 1rem;
 
-      .segment-modal {
-        padding: 1.25rem;
-      }
+    .segment-modal {
+      padding: 0;
     }
   }
 }

@@ -150,7 +150,7 @@ def test_file_validator():
         validator = FileUploadValidator()
 
         # Test configuration
-        assert validator.MAX_FILE_SIZE == 10 * 1024 * 1024
+        assert validator.MAX_FILE_SIZE == 20 * 1024 * 1024
         assert "application/pdf" in validator.ALLOWED_CONTENT_TYPES
         assert ".pdf" in validator.ALLOWED_EXTENSIONS
 

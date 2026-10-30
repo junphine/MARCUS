@@ -168,7 +168,7 @@ api.interceptors.response.use(
       // Handle specific status codes
       switch(error.response.status) {
         case 413: // Request Entity Too Large
-          console.error('The file you are trying to upload is too large. Maximum allowed size is 10MB.');
+          console.error('The file you are trying to upload is too large. Maximum allowed size is 20MB.');
           // You could display a user-friendly message here
           break;
 

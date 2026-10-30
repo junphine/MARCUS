@@ -692,17 +692,18 @@ async def extract_pdf_text_with_headers(
 
 async def extract_pdf_markdown(
     pdf_file: UploadFile = File(...),
-    pages: int = Form(2, description="Number of pages to process"),
+    pages: int = Form(0, description="Number of pages to process (0 = all pages)"),
 ):
     """
     Extract Markdown content from an uploaded PDF file using Docling.
 
-    Handles PDF upload, converts the first N pages with Docling,
+    Handles PDF upload, converts the document with Docling,
     and exports the document as Markdown text.
 
     Args:
         pdf_file (UploadFile): The PDF file to process (required).
-        pages (int): Number of pages to process from the beginning. Defaults to 2.
+        pages (int): Number of pages to process from the beginning.
+                     0 or a negative value means the whole document. Defaults to 0.
 
     Returns:
         dict: JSON object containing:
@@ -739,8 +740,13 @@ async def extract_pdf_markdown(
                 buffer.write(content)
 
         # Process the PDF file with Docling and export as Markdown
-        output_pdf_file_path = extract_first_three_pages(file_path, pages)
-        conv_result: ConversionResult = doc_converter.convert(output_pdf_file_path)
+        # Only truncate to the first N pages when explicitly requested (pages > 0)
+        if pages and pages > 0:
+            path_to_convert = extract_first_three_pages(file_path, pages)
+        else:
+            path_to_convert = file_path
+
+        conv_result: ConversionResult = doc_converter.convert(path_to_convert)
         markdown_text = conv_result.document.export_to_markdown()
 
         return {"text": markdown_text, "pdf_filename": safe_filename}

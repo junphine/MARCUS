@@ -20,7 +20,7 @@
           <vue-feather type="file-plus" size="48" class="upload-icon"></vue-feather>
           <h3>Upload PDF Document</h3>
           <p>Drag & drop your file here or click to browse</p>
-          <p class="file-types">Supported file type: PDF (max 10MB)</p>
+          <p class="file-types">Supported file type: PDF (max 20MB)</p>
         </div>
         
         <div v-else class="file-info">
@@ -116,10 +116,10 @@
           return
         }
         
-        // Check file size (max 10MB)
-        const maxSize = 10 * 1024 * 1024 // 10MB in bytes
+        // Check file size (max 20MB)
+        const maxSize = 20 * 1024 * 1024 // 20MB in bytes
         if (file.size > maxSize) {
-          this.$emit('error', 'File size exceeds 10MB limit')
+          this.$emit('error', 'File size exceeds 20MB limit')
           return
         }
         

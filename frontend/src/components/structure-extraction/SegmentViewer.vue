@@ -536,8 +536,8 @@
 
     <!-- Structure Editor Modal -->
     <KetcherEditorModal :visible="showStructureEditor" :initialSmiles="displayedStructure?.smiles"
-      :initialMolfile="displayedStructure?.molfile" @close="showStructureEditor = false"
-      @apply="onStructureEditApply" />
+      :initialMolfile="editableMolfile" @close="showStructureEditor = false"
+      @apply="onStructureEditApply" @error="handleStructureError" />
   </div>
 </template>
 
@@ -551,6 +551,7 @@ import depictionService from '@/services/depictionService'
 import similarityService from '@/services/similarityService'
 import { getApiImageUrl } from '@/services/api'
 import eventBus from '@/utils/eventBus';
+import { copyTextToClipboard } from '@/utils/clipboard';
 
 export default {
   name: 'SegmentViewer',
@@ -636,6 +637,14 @@ export default {
     displayedStructure() {
       // Use the local edited structure if available, otherwise use the prop
       return this.currentStructure || this.processedStructure || null;
+    },
+    editableMolfile() {
+      // MoleCode's "molfile" is actually a mermaid graph, not a real molfile,
+      // so Ketcher cannot parse it - only pass real molfiles to the editor
+      if (!this.displayedStructure || this.displayedStructure.engine === 'molecode') {
+        return '';
+      }
+      return this.displayedStructure.molfile || '';
     },
     hasStructure() {
       return !!this.displayedStructure;
@@ -863,19 +872,14 @@ export default {
     copyEngineSmiles(smiles) {
       if (!smiles) return;
 
-      try {
-        navigator.clipboard.writeText(smiles)
-          .then(() => {
-            this.$emit('copy-complete', 'SMILES copied to clipboard');
-          })
-          .catch(err => {
-            console.error('Could not copy SMILES:', err);
-            this.$emit('error', 'Failed to copy SMILES');
-          });
-      } catch (error) {
-        console.error('Error copying to clipboard:', error);
-        this.$emit('error', 'Failed to copy to clipboard');
-      }
+      copyTextToClipboard(smiles)
+        .then(() => {
+          this.$emit('copy-complete', 'SMILES copied to clipboard');
+        })
+        .catch(err => {
+          console.error('Could not copy SMILES:', err);
+          this.$emit('error', 'Failed to copy SMILES');
+        });
     },
 
     showInContext() {
@@ -1202,20 +1206,15 @@ export default {
     copySmilesToClipboard() {
       if (!this.displayedStructure || !this.displayedStructure.smiles) return;
 
-      try {
-        navigator.clipboard.writeText(this.displayedStructure.smiles)
-          .then(() => {
-            // Show success message
-            this.$emit('copy-complete', 'SMILES copied to clipboard');
-          })
-          .catch(err => {
-            console.error('Could not copy SMILES:', err);
-            this.$emit('error', 'Failed to copy SMILES');
-          });
-      } catch (error) {
-        console.error('Error copying to clipboard:', error);
-        this.$emit('error', 'Failed to copy to clipboard');
-      }
+      copyTextToClipboard(this.displayedStructure.smiles)
+        .then(() => {
+          // Show success message
+          this.$emit('copy-complete', 'SMILES copied to clipboard');
+        })
+        .catch(err => {
+          console.error('Could not copy SMILES:', err);
+          this.$emit('error', 'Failed to copy SMILES');
+        });
     },
 
     async downloadSegmentImage() {

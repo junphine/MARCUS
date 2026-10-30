@@ -514,8 +514,8 @@ async def generate_with_depiction(
     hand_drawn: bool = Form(
         False, description="Whether to use the hand-drawn model (only for DECIMER)"
     ),
-    depict_engine: Literal["cdk", "rdkit"] = Form(
-        "rdkit", description="Depiction engine to use"
+    depict_engine: Literal["cdk", "rdkit", "mermaid"] = Form(
+        "cdk", description="Depiction engine to use"
     ),
     depict_width: int = Form(512, description="Width of the depiction in pixels"),
     depict_height: int = Form(512, description="Height of the depiction in pixels"),
@@ -557,21 +557,40 @@ async def generate_with_depiction(
         smiles = ocsr_result.get("smiles", "")
         molfile = ocsr_result.get("molfile", "")
 
-        # Use the depiction module to generate a depiction
+        if engine=='molecode' and molfile:
+            depict_engine = 'mermaid'
+        else:
+            molfile = molfile if output_type in ["molfile", "both"] else None
 
-        depiction_result = generate_depiction(
-            smiles=smiles,
-            molfile=molfile if output_type in ["molfile", "both"] else None,
-            engine=depict_engine,
-            mol_size=(depict_width, depict_height),
-            rotate=0,  # Default to no rotation for OCSR results
-            kekulize=True,
-            cip=True,
-            unicolor=False,
-            highlight="",
-            transparent=False,
-            format=depict_format,
-        )
+        # Use the depiction module to generate a depiction
+        try:
+            depiction_result = generate_depiction(
+                smiles=smiles,
+                molfile=molfile,
+                engine=depict_engine,
+                mol_size=(depict_width, depict_height),
+                rotate=0,  # Default to no rotation for OCSR results
+                kekulize=True,
+                cip=True,
+                unicolor=False,
+                highlight="",
+                transparent=False,
+                format=depict_format,
+            )
+        except Exception as e:
+            depiction_result = generate_depiction(
+                smiles=smiles,
+                molfile=ocsr_result.get("molfile", ""),
+                engine='mermaid',
+                mol_size=(depict_width, depict_height),
+                rotate=0,  # Default to no rotation for OCSR results
+                kekulize=True,
+                cip=True,
+                unicolor=False,
+                highlight="",
+                transparent=False,
+                format=depict_format,
+            )
 
         # Format the result for the response
         result = {

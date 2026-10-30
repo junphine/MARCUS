@@ -33,26 +33,28 @@ and prints exactly what would be sent.
 import sys
 from pathlib import Path
 from typing import Tuple, Dict, Union, Literal, Any
-from molecode.prompts import MARKUSH_SYSTEM_PROMPT
-from molecode.markush import mermaid_to_mol, mol_to_smiles, has_invalid_atoms
+from molecode.prompts import MARKUSH_SYSTEM_PROMPT,MOLECULE_SYSTEM_PROMPT
+from molecode.markush import mermaid_to_mol, mol_to_smiles, mol_to_mermaid, has_invalid_atoms
 from molecode.llm import LLMClient
-
-DEMO_NAME = "Aspirin"
-DEMO_SMILES = "CC(=O)Oc1ccccc1C(=O)O"
+from rdkit import Chem
+from rdkit.Chem import Draw
 
 USER_INSTRUCTION = (
     "Read the molecular structure in this image and output it as a MoleCode "
     "graph. Respond with ONLY a single fenced ```mermaid code block."
 )
 
+USER_INSTRUCTION_MARKUSH = (
+    "Read the molecular markush structure in this image and output it as a MoleCode "
+    "graph. Respond with ONLY a single fenced ```mermaid code block."
+)
 
-def render_demo_image(path: str) -> None:
+def smiles_to_mermaid(smiles: str) -> None:
     """Render the demo molecule to a PNG so the example is self-contained."""
-    from rdkit import Chem
-    from rdkit.Chem import Draw
-    mol = Chem.MolFromSmiles(DEMO_SMILES)
-    Draw.MolToFile(mol, path, size=(450, 450))
 
+    mol = Chem.MolFromSmiles(smiles)
+    mermaid = mol_to_mermaid(mol)
+    return mermaid
 
 def extract_mermaid(text: str) -> str:
     """Pull the fenced ```mermaid ... ``` block out of an LLM reply."""
@@ -64,6 +66,7 @@ def extract_mermaid(text: str) -> str:
     return block.strip()
 
 
+
 def extract_smiles(image_path:str,expected_smiles = None) -> Dict[str, Any]:
     path = Path(image_path)
     if not path.exists():
@@ -73,20 +76,73 @@ def extract_smiles(image_path:str,expected_smiles = None) -> Dict[str, Any]:
 
     # 2. send image + Markush MoleCode prompt to a vision model.
     try:
-        client = LLMClient()
+        client = LLMClient(timeout=600)
     except ValueError:
         print("\n" + "=" * 70)
         print("DRY RUN — no MOLECODE_API_KEY/OPENAI_API_KEY set.")
         print(f"Would send the image '{image_path}' plus this system prompt to a")
         print("vision-capable model and parse the returned MoleCode graph:\n")
-        print(f"  system = MARKUSH_SYSTEM_PROMPT  ({len(MARKUSH_SYSTEM_PROMPT)} chars)")
+        print(f"  system = MOLECULE_SYSTEM_PROMPT  ({len(MOLECULE_SYSTEM_PROMPT)} chars)")
         print(f"  user   = {USER_INSTRUCTION}")
         print(f"  images = ['{image_path}']")
         print("=" * 70)
         return None
 
     print(f"Calling vision model '{client.model}' for OCSR ...")
-    reply = client.chat(USER_INSTRUCTION, system=MARKUSH_SYSTEM_PROMPT,
+    reply = client.chat(USER_INSTRUCTION, system=MOLECULE_SYSTEM_PROMPT,
+                        images=[image_path])
+
+    # 3. extract + validate the MoleCode graph.
+    graph = extract_mermaid(reply)
+    print("\nPredicted MoleCode graph:\n")
+    print(graph)
+    result = dict(graph=graph,image_name=image_name)
+    mol = mermaid_to_mol(graph, strict=False)
+    if mol is None:
+        print("\nCould not parse the predicted graph.")
+        return result
+
+    result['mol'] = mol
+    recovered = mol_to_smiles(mol)
+    print("\nRecovered SMILES:", recovered,
+          "(contains abbreviation placeholders)" if has_invalid_atoms(mol) else "")
+
+    result['smiles'] = recovered
+
+    # 4. compare against ground truth when we rendered a known molecule.
+    if expected_smiles is not None:
+        from rdkit import Chem
+        try:
+            match = Chem.CanonSmiles(recovered) == Chem.CanonSmiles(expected_smiles)
+        except Exception:
+            match = False
+        print(f"Matches ground truth ({expected_smiles}): {match}")
+    return result
+
+
+def extract_markush_smiles(image_path:str,expected_smiles = None) -> Dict[str, Any]:
+    path = Path(image_path)
+    if not path.exists():
+        raise FileNotFoundError(f"Image file not found: {path}")
+
+    image_name = path.name
+
+    # 2. send image + Markush MoleCode prompt to a vision model.
+    try:
+        client = LLMClient(timeout=600)
+    except ValueError:
+        print("\n" + "=" * 70)
+        print("DRY RUN — no MOLECODE_API_KEY/OPENAI_API_KEY set.")
+        print(f"Would send the image '{image_path}' plus this system prompt to a")
+        print("vision-capable model and parse the returned MoleCode graph:\n")
+        print(f"  system = MARKUSH_SYSTEM_PROMPT  ({len(MARKUSH_SYSTEM_PROMPT)} chars)")
+        print(f"  user   = {USER_INSTRUCTION_MARKUSH}")
+        print(f"  images = ['{image_path}']")
+        print("=" * 70)
+        return None
+
+    print(f"Calling vision model '{client.model}' for OCSR ...")
+    reply = client.chat(USER_INSTRUCTION_MARKUSH, system=MARKUSH_SYSTEM_PROMPT,
                         images=[image_path])
 
     # 3. extract + validate the MoleCode graph.

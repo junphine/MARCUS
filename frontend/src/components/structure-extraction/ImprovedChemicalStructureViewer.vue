@@ -81,9 +81,11 @@ export default {
     shouldUseMolfile() {
       // Use molfile if available AND either:
       // 1. useCoordinates prop is true (explicit request to use coordinates)
-      // 2. The source is molparser AND there's no explicit request not to use coordinates
+      // 2. The source is molecode (its molfile is a mermaid graph rendered by merman)
+      // 3. The source is molparser AND there's no explicit request not to use coordinates
       return !!this.molfile &&
         (this.useCoordinates === true ||
+          this.sourceEngine === 'molecode' ||
           (this.sourceEngine === 'molparser' &&
             this.useCoordinates !== false))
     },
@@ -144,12 +146,16 @@ export default {
           console.log(`[Depiction] Has molfile: ${!!this.molfile}`);
         }
 
-        // Determine whether to use SMILES or molfile
+        // Determine whether to use the molfile for depiction
         this.usingMolfile = this.shouldUseMolfile
 
-        // Set up options for the depiction service - always use CDK
+        // MoleCode results are rendered with the mermaid engine (their
+        // molfile is a mermaid graph); everything else uses CDK
+        const isMolecode = this.sourceEngine === 'molecode'
+
+        // Set up options for the depiction service
         const options = {
-          engine: 'cdk',
+          engine: isMolecode ? 'mermaid' : 'cdk',
           width: 400,
           height: 300,
           format: 'svg',
@@ -158,14 +164,19 @@ export default {
           unicolor: false
         }
 
-        // Add either SMILES or molfile based on the decision
-        if (this.usingMolfile) {
-          console.log(`[Depiction] Using molfile for ${this.name || 'structure'} (${this.sourceEngine})`);
-          options.molfile = this.molfile
-          options.useMolfileDirectly = true  // Flag to tell backend to use the molfile directly
-        } else {
-          console.log(`[Depiction] Using SMILES for ${this.name || 'structure'} (${this.sourceEngine})`);
+        // Include SMILES when available
+        if (this.smiles) {
           options.smiles = this.smiles
+        }
+
+        // Always include the molfile when available: mermaid renders the
+        // MoleCode graph directly, and CDK uses the molfile coordinates
+        // when use_molfile_directly is set
+        if (this.molfile) {
+          console.log(`[Depiction] Including molfile for ${this.name || 'structure'} (${this.sourceEngine})`);
+          options.molfile = this.molfile
+          // snake_case so the backend pydantic model picks it up
+          options.use_molfile_directly = this.usingMolfile
         }
 
         // Add highlight pattern if provided
@@ -181,7 +192,7 @@ export default {
         this.depictionFormat = 'svg'
         this.initialized = true
 
-        console.log(`[Depiction] Successfully generated depiction for ${this.name || 'structure'} (${this.sourceEngine}) using ${this.usingMolfile ? 'molfile' : 'SMILES'}`);
+        console.log(`[Depiction] Successfully generated depiction for ${this.name || 'structure'} (${this.sourceEngine}) with ${options.engine} using ${this.usingMolfile ? 'molfile' : 'SMILES'}`);
 
       } catch (error) {
         console.error(`[Depiction] Error generating depiction for ${this.sourceEngine}:`, error)

@@ -13,6 +13,7 @@ from app.modules.cdk_wrapper import (
     get_cip_annotation,
     read_molfile_as_cdk_mol,
 )
+from onmt.modules import global_attention
 
 # Only import cairosvg if needed for PNG conversion
 try:
@@ -21,6 +22,9 @@ try:
     CAIROSVG_AVAILABLE = True
 except ImportError:
     CAIROSVG_AVAILABLE = False
+
+
+merman_engine = None
 
 
 def get_cdk_depiction(
@@ -153,7 +157,7 @@ def get_cdk_depiction(
 def generate_depiction(
     smiles: str = None,
     molfile: str = None,
-    engine: Literal["cdk", "rdkit"] = "cdk",
+    engine: Literal["cdk", "rdkit", "mermaid"] = "cdk",
     mol_size: Tuple[int, int] = (512, 512),
     rotate: float = 0,
     kekulize: bool = True,
@@ -187,6 +191,7 @@ def generate_depiction(
     Raises:
         HTTPException: If input or parameters are invalid
     """
+    global merman_engine
     # Debug: Log input parameters
 
     # Validate input
@@ -196,12 +201,25 @@ def generate_depiction(
             detail="Either SMILES or molfile must be provided",
         )
 
-    # Always use CDK
-    engine = "cdk"
+    svg_string = None
+    source_type = "unknown"
 
-    try:
-        svg_string = None
-        source_type = "unknown"
+    if engine == 'mermaid':
+        from .molecode_wrapper import smiles_to_mermaid
+        import merman
+        if not molfile:
+            molfile = smiles_to_mermaid(smiles)
+            source_type = "smiles_generated"
+        else:
+            source_type = "molfile_with_coords"
+        if merman_engine is None:
+            merman_engine = merman.MermanEngine(None,None)
+
+        svg_string = merman_engine.render_svg(molfile,None)
+
+    else:
+        # Always use CDK
+        engine = "cdk"
 
         # For CDK engine
         if molfile and use_molfile_directly or smiles is None:
@@ -259,58 +277,52 @@ def generate_depiction(
             )
             source_type = "smiles_generated"
 
-        # Convert to requested format
-        if format == "svg":
-            # Return SVG directly
-            return {
-                "format": "svg",
-                "engine": engine,
-                "depiction": svg_string,
-                "source_type": source_type,
-            }
-        else:
-            # Convert SVG to PNG using cairosvg if available
-            try:
-                if not CAIROSVG_AVAILABLE:
-                    return {
-                        "format": "svg",
-                        "engine": engine,
-                        "depiction": svg_string,
-                        "source_type": source_type,
-                        "warning": "cairosvg not available, returning SVG instead",
-                    }
-
-                png_data = cairosvg.svg2png(bytestring=svg_string.encode())
-
-                # Return as base64 if requested
-                if format == "base64":
-                    base64_data = base64.b64encode(png_data).decode()
-                    return {
-                        "format": "base64",
-                        "engine": engine,
-                        "depiction": base64_data,
-                        "source_type": source_type,
-                    }
-                else:
-                    # Return binary PNG data
-                    return {
-                        "format": "png",
-                        "engine": engine,
-                        "depiction": png_data,
-                        "source_type": source_type,
-                    }
-            except Exception as e:
-                # Fall back to SVG if PNG conversion fails
+    # Convert to requested format
+    if format == "svg":
+        # Return SVG directly
+        return {
+            "format": "svg",
+            "engine": engine,
+            "depiction": svg_string,
+            "source_type": source_type,
+        }
+    else:
+        # Convert SVG to PNG using cairosvg if available
+        try:
+            if not CAIROSVG_AVAILABLE:
                 return {
                     "format": "svg",
                     "engine": engine,
                     "depiction": svg_string,
                     "source_type": source_type,
-                    "warning": f"PNG conversion failed: {str(e)}, returning SVG instead",
+                    "warning": "cairosvg not available, returning SVG instead",
                 }
 
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error generating depiction: {str(e)}",
-        )
+            png_data = cairosvg.svg2png(bytestring=svg_string.encode())
+
+            # Return as base64 if requested
+            if format == "base64":
+                base64_data = base64.b64encode(png_data).decode()
+                return {
+                    "format": "base64",
+                    "engine": engine,
+                    "depiction": base64_data,
+                    "source_type": source_type,
+                }
+            else:
+                # Return binary PNG data
+                return {
+                    "format": "png",
+                    "engine": engine,
+                    "depiction": png_data,
+                    "source_type": source_type,
+                }
+        except Exception as e:
+            # Fall back to SVG if PNG conversion fails
+            return {
+                "format": "svg",
+                "engine": engine,
+                "depiction": svg_string,
+                "source_type": source_type,
+                "warning": f"PNG conversion failed: {str(e)}, returning SVG instead",
+            }

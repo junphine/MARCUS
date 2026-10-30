@@ -84,6 +84,7 @@
 
 <script>
 import { marked } from 'marked'
+import { getApiImageUrl } from '@/services/api'
 import HighlightedText from './HighlightedText.vue'
 import AnnotationViewer from './AnnotationViewer.vue'
 
@@ -105,6 +106,10 @@ export default {
     isLoadingAnnotations: {
       type: Boolean,
       default: false
+    },
+    pdfFilename: {
+      type: String,
+      default: ''
     }
   },
   data() {
@@ -116,9 +121,34 @@ export default {
     hasText() {
       return !!this.extractedText
     },
-    renderedMarkdown() {
+    /**
+     * Markdown with docling's <!-- image --> placeholders replaced by
+     * real segment image URIs, e.g.
+     * http://localhost:9000/latest/decimer/get_segment_image/{pdf}/picture_1_segmented.png
+     * The numbering matches the backend segmentation order (picture_1, picture_2, ...).
+     */
+    markdownWithImages() {
       if (!this.extractedText) return ''
-      return marked.parse(this.extractedText)
+      if (!this.pdfFilename) return this.extractedText
+
+      // Segment directory naming follows the backend decimer segmentation
+      // router: re.sub(r"[^\w.-]", "_", filename), without the .pdf extension
+      const pdfStem = this.pdfFilename
+        .replace(/[^\w.-]/g, '_')
+        .replace(/\.pdf$/i, '')
+
+      let figureIndex = 0
+      return this.extractedText.replace(/<!--\s*image\s*-->/g, () => {
+        figureIndex += 1
+        const imageUrl = getApiImageUrl(
+          `${pdfStem}/all_segments/picture_${figureIndex}_segmented.png`
+        )
+        return `![Figure ${figureIndex}](${imageUrl})`
+      })
+    },
+    renderedMarkdown() {
+      if (!this.markdownWithImages) return ''
+      return marked.parse(this.markdownWithImages)
     }
   },
   methods: {
@@ -126,9 +156,9 @@ export default {
       this.$emit('extract-annotations')
     },
     downloadText() {
-      if (!this.extractedText) return
+      if (!this.markdownWithImages) return
 
-      const blob = new Blob([this.extractedText], { type: 'text/markdown' })
+      const blob = new Blob([this.markdownWithImages], { type: 'text/markdown' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url

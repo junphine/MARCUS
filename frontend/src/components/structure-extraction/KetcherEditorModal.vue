@@ -32,9 +32,11 @@ export default {
     initialMolfile: { type: String, default: '' },
     ketcherPath: { type: String, default: '/ketcher/index.html' }
   },
+  emits: ['close', 'apply', 'error'],
   data() {
     return {
-      ketcherLoaded: false
+      ketcherReady: false,
+      initCheckInterval: null
     }
   },
   computed: {
@@ -46,111 +48,127 @@ export default {
   watch: {
     visible(val) {
       if (val) {
-        this.ketcherLoaded = false;
+        this.ketcherReady = false;
+        // Listen for Ketcher's init message before the iframe starts loading
+        window.addEventListener('message', this.onKetcherInit);
+      } else {
+        this.cleanup();
       }
     }
   },
+  beforeUnmount() {
+    this.cleanup();
+  },
   methods: {
+    cleanup() {
+      window.removeEventListener('message', this.onKetcherInit);
+      if (this.initCheckInterval) {
+        clearInterval(this.initCheckInterval);
+        this.initCheckInterval = null;
+      }
+    },
+
+    getKetcherApi() {
+      const frame = this.$refs.ketcherFrame;
+      if (!frame || !frame.contentWindow) return null;
+      return frame.contentWindow.ketcher || null;
+    },
+
+    onKetcherInit(event) {
+      // Ketcher posts { eventType: 'init' } to the parent once its API is ready
+      const frame = this.$refs.ketcherFrame;
+      if (!frame || event.source !== frame.contentWindow) return;
+      if (!event.data || event.data.eventType !== 'init') return;
+
+      console.log('Ketcher init message received');
+      this.markReady();
+    },
+
+    markReady() {
+      if (this.ketcherReady) return;
+      this.ketcherReady = true;
+      window.removeEventListener('message', this.onKetcherInit);
+      if (this.initCheckInterval) {
+        clearInterval(this.initCheckInterval);
+        this.initCheckInterval = null;
+      }
+      this.setStructure();
+    },
+
     onKetcherLoad() {
-      this.ketcherLoaded = true;
       console.log('Ketcher iframe loaded, initial SMILES:', this.initialSmiles ? this.initialSmiles.substring(0, 30) + '...' : 'none');
       console.log('Initial molfile present:', !!this.initialMolfile);
-      
-      // Give Ketcher time to fully initialize
-      setTimeout(() => {
-        this.setStructure();
-      }, 800);
+
+      // Fallback: poll for the ketcher API in case the init message was missed
+      let attempts = 0;
+      this.initCheckInterval = setInterval(() => {
+        if (this.ketcherReady) {
+          clearInterval(this.initCheckInterval);
+          this.initCheckInterval = null;
+          return;
+        }
+        attempts++;
+        if (this.getKetcherApi()) {
+          console.log('Ketcher API detected via polling');
+          this.markReady();
+        } else if (attempts >= 50) { // ~10 seconds
+          clearInterval(this.initCheckInterval);
+          this.initCheckInterval = null;
+          console.error('Ketcher API did not become available');
+          this.$emit('error', 'Ketcher editor failed to initialize');
+        }
+      }, 200);
     },
-    
+
     setStructure() {
-      const frame = this.$refs.ketcherFrame;
-      if (!frame || !frame.contentWindow) {
-        console.error('Ketcher iframe reference not available');
+      const ketcher = this.getKetcherApi();
+      if (!ketcher) {
+        console.error('Ketcher API not available');
         return;
       }
-      
-      try {
-        console.log('Setting structure in Ketcher');
-        // Attempt to use Ketcher's API directly if available
-        if (frame.contentWindow.ketcher) {
-          console.log('Using direct Ketcher API');
-          if (this.initialMolfile) {
-            frame.contentWindow.ketcher.setMolecule(this.initialMolfile);
-          } else if (this.initialSmiles) {
-            frame.contentWindow.ketcher.setMolecule(this.initialSmiles);
-          }
-          return;
-        }
-        
-        // Fall back to postMessage API
-        if (this.initialMolfile) {
-          frame.contentWindow.postMessage({
-            type: 'ketcher:set-structure',
-            payload: { molfile: this.initialMolfile }
-          }, '*');
-          console.log('Sent molfile to Ketcher via postMessage');
-        } else if (this.initialSmiles) {
-          frame.contentWindow.postMessage({
-            type: 'ketcher:set-structure',
-            payload: { smiles: this.initialSmiles }
-          }, '*');
-          console.log('Sent SMILES to Ketcher via postMessage');
-        }
-      } catch (error) {
-        console.error('Error setting structure in Ketcher:', error);
-      }
-    },
-    
-    applyEdits() {
-      const frame = this.$refs.ketcherFrame;
-      if (!frame || !frame.contentWindow) {
-        console.error('Ketcher iframe reference not available');
+
+      // Prefer the molfile (keeps the original coordinates), fall back to SMILES
+      const structure = this.initialMolfile || this.initialSmiles;
+      if (!structure) {
+        console.log('No initial structure to load into Ketcher');
         return;
       }
-      
-      try {
-        // Direct API approach (for standalone Ketcher)
-        if (frame.contentWindow.ketcher) {
-          console.log('Using direct Ketcher API to get structure');
-          Promise.all([
-            frame.contentWindow.ketcher.getSmiles(),
-            frame.contentWindow.ketcher.getMolfile()
-          ]).then(([smiles, molfile]) => {
-            console.log('Got structure from Ketcher API:', smiles ? smiles.substring(0, 30) + '...' : 'none');
-            const result = { smiles, molfile };
-            this.$emit('apply', result);
-          }).catch(error => {
-            console.error('Error getting structure from Ketcher API:', error);
+
+      console.log('Setting structure in Ketcher via', this.initialMolfile ? 'molfile' : 'SMILES');
+      Promise.resolve(ketcher.setMolecule(structure)).catch(error => {
+        console.error('Ketcher failed to load the structure:', error);
+        // If the molfile failed but we also have SMILES, retry with SMILES
+        if (this.initialMolfile && this.initialSmiles) {
+          console.log('Retrying with SMILES');
+          Promise.resolve(ketcher.setMolecule(this.initialSmiles)).catch(e => {
+            console.error('Ketcher also failed to load SMILES:', e);
+            this.$emit('error', 'Failed to load structure into the editor');
           });
-          return;
+        } else {
+          this.$emit('error', 'Failed to load structure into the editor');
         }
-        
-        // postMessage approach (for iframe communication)
-        console.log('Using postMessage to get structure from Ketcher');
-        // Create a response handler for Ketcher's reply
-        const onMessage = (event) => {
-          if (event.data && event.data.type === 'ketcher:structure') {
-            console.log('Received structure from Ketcher:', event.data.payload);
-            this.$emit('apply', event.data.payload);
-            window.removeEventListener('message', onMessage);
-          }
-        };
-        
-        window.addEventListener('message', onMessage);
-        
-        // Request structure format that includes both SMILES and molfile
-        frame.contentWindow.postMessage({ 
-          type: 'ketcher:get-structure', 
-          payload: { format: 'chemical' } 
-        }, '*');
-      } catch (error) {
-        console.error('Error getting structure from Ketcher:', error);
-      }
+      });
     },
-    
-    beforeDestroy() {
-      // Clean up message listener when component is destroyed
-      window.removeEventListener('message', this.handleKetcherMessages);
+
+    async applyEdits() {
+      const ketcher = this.getKetcherApi();
+      if (!ketcher) {
+        console.error('Ketcher API not available');
+        this.$emit('error', 'Ketcher editor is not ready');
+        return;
+      }
+
+      try {
+        const [smiles, molfile] = await Promise.all([
+          ketcher.getSmiles(),
+          ketcher.getMolfile()
+        ]);
+        console.log('Got structure from Ketcher API:', smiles ? smiles.substring(0, 30) + '...' : 'none');
+        this.$emit('apply', { smiles, molfile });
+      } catch (error) {
+        console.error('Error getting structure from Ketcher API:', error);
+        this.$emit('error', 'Failed to get structure from the editor');
+      }
     }
   }
 }

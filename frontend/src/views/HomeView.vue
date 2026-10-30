@@ -73,6 +73,7 @@
             :extractedText="extractedText"
             :annotations="annotations"
             :isLoadingAnnotations="isLoadingAnnotations"
+            :pdfFilename="extractedTextMetadata && extractedTextMetadata.pdfFilename ? extractedTextMetadata.pdfFilename : ''"
             @extract-annotations="extractAnnotations"
           />
         </div>
@@ -438,6 +439,7 @@ export default {
       pdfUrl: state => state.pdf.url,
       pdfFile: state => state.pdf.file,
       extractedText: state => state.text.content,
+      extractedTextMetadata: state => state.text.metadata,
       annotations: state => state.annotations.items,
       segments: state => state.structures.segments,
       convertedStructures: state => state.structures.convertedStructures
@@ -1894,7 +1896,7 @@ getStoredDOI() {
 .columns-container {
   display: flex;
   gap: 0;
-  min-height: calc(100vh - 253px); /* Adjusted for reduced header height (was 260px, now 253px - saving 7px) */
+  min-height: 300px; /* Adjusted for reduced header height (was 260px, now 253px - saving 7px) */
   width: 100%;
   position: relative;
   overflow-x: hidden; /* Prevent horizontal scrolling from the column resizers */
@@ -1921,30 +1923,6 @@ getStoredDOI() {
       .btn-primary {
         white-space: nowrap;
         flex-shrink: 0;
-      }
-    }
-  }
-  
-  /* Ensure segment modal appears correctly */
-  :deep(.segment-modal-backdrop) {
-    z-index: 1100; /* Higher z-index to ensure it appears over other elements */
-    
-    .segment-modal {
-      max-height: 90vh;
-      max-width: 90vw;
-      width: 90vw;
-      
-      @media (min-width: 768px) {
-        width: 90vw;
-      }
-      
-      @media (min-width: 1024px) {
-        width: 80vw;
-      }
-      
-      @media (min-width: 1280px) {
-        width: auto;
-        max-width: 1000px;
       }
     }
   }

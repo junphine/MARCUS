@@ -53,6 +53,7 @@ pillow-heif
 scikit-image
 matplotlib
 pandas
+merman==0.9.2
 
 # Chemistry-specific
 jpype1==1.5.2

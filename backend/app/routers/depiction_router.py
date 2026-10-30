@@ -35,7 +35,7 @@ class DepictionRequest(BaseModel):
         description="Whether to use molfile directly with CDK without generating coordinates",
     )
     # Engine is ignored - always uses CDK
-    engine: Literal["cdk", "rdkit"] = Field(
+    engine: Literal["cdk", "rdkit", "mermaid"] = Field(
         "cdk", description="Depiction engine to use (always CDK)"
     )
     width: int = Field(
@@ -127,21 +127,40 @@ async def create_depiction(request: DepictionRequest):
                 detail="Either SMILES or molfile must be provided",
             )
 
-        # Generate depiction - always use CDK
-        result = generate_depiction(
-            smiles=request.smiles,
-            molfile=request.molfile,
-            engine="cdk",  # Always use CDK
-            mol_size=(request.width, request.height),
-            rotate=request.rotate,
-            kekulize=request.kekulize,
-            cip=request.cip,
-            unicolor=request.unicolor,
-            highlight=request.highlight,
-            transparent=request.transparent,
-            format=request.format,
-            use_molfile_directly=request.use_molfile_directly,
-        )
+        engine = "cdk" # Always use CDK
+
+        # Generate depiction
+        try:
+            result = generate_depiction(
+                smiles=request.smiles,
+                molfile=request.molfile,
+                engine=engine,
+                mol_size=(request.width, request.height),
+                rotate=request.rotate,
+                kekulize=request.kekulize,
+                cip=request.cip,
+                unicolor=request.unicolor,
+                highlight=request.highlight,
+                transparent=request.transparent,
+                format=request.format,
+                use_molfile_directly=request.use_molfile_directly,
+            )
+        except Exception as e:
+            result = generate_depiction(
+                smiles=request.smiles,
+                molfile=request.molfile,
+                engine='mermaid',
+                mol_size=(request.width, request.height),
+                rotate=request.rotate,
+                kekulize=request.kekulize,
+                cip=request.cip,
+                unicolor=request.unicolor,
+                highlight=request.highlight,
+                transparent=request.transparent,
+                format=request.format,
+                use_molfile_directly=request.use_molfile_directly,
+            )
+
         # Return response based on format
         if request.format == "svg":
             return Response(content=result["depiction"], media_type="image/svg+xml")

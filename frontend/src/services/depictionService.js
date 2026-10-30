@@ -39,9 +39,9 @@ const depictionService = {
       }
       
       const requestData = { ...defaults, ...options }
-      
-      // Ensure we're always using CDK regardless of what was passed
-      requestData.engine = 'cdk';
+
+      // The engine can be overridden by the caller (e.g. 'mermaid' for
+      // MoleCode results); it defaults to 'cdk' when not specified.
       
       // Make sure we're prioritizing molfile properly when useMolfileDirectly is true
       if (requestData.useMolfileDirectly && requestData.molfile) {
