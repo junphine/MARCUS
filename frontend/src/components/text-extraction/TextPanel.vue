@@ -236,6 +236,7 @@ export default {
       overflow-y: auto;
       margin-bottom: 1.5rem;
       min-height: 200px;
+      max-height: calc(100vh - 100px);
 
       .view-toggle {
         display: flex;

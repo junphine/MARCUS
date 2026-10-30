@@ -77,7 +77,6 @@ RUN if [ "$TARGETPLATFORM" = "linux/arm64" ] || [ "$(uname -m)" = "aarch64" ] ||
 
 # Install specialized packages
 RUN pip install decimer --no-deps && \
-    pip install git+https://github.com/CrystalEye42/MolScribe.git@250f683f52f5050eb624870ccfd04bccbcaa27e1 --no-deps && \
     pip install git+https://github.com/Kohulan/DECIMER-Image-Segmentation.git@development --no-deps
 
 RUN pip install numpy==1.24.3

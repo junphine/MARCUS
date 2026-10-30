@@ -35,8 +35,8 @@ class PathInput(BaseModel):
     """Model for inputting an image path."""
 
     path: str = Field(..., description="Path to the chemical structure image")
-    engine: Literal["molecode", "molparser", "molscribe"] = Field(
-        "molecode", description="OCSR engine to use (molecode, molparser, or molscribe)"
+    engine: Literal["molecode", "molparser"] = Field(
+        "molecode", description="OCSR engine to use (molecode or molparser)"
     )
 
 
@@ -141,7 +141,7 @@ async def generate_smiles(
     image_path: Optional[str] = Form(
         None, description="Path to existing chemical structure image"
     ),
-    engine: Literal["molecode", "molparser", "molscribe"] = Form(
+    engine: Literal["molecode", "molparser"] = Form(
         "molecode", description="OCSR engine to use"
     ),
     hand_drawn: bool = Form(
@@ -156,7 +156,7 @@ async def generate_smiles(
     Args:
         image_file: The chemical structure image file to upload (optional)
         image_path: Path to an existing chemical structure image on the server (optional)
-        engine: OCSR engine to use (molecode, molparser, or molscribe)
+        engine: OCSR engine to use (molecode or molparser)
         hand_drawn: Whether to use the hand-drawn model (only applicable for DECIMER)
 
     Returns:
@@ -239,7 +239,7 @@ async def generate_molfile(
     image_path: Optional[str] = Form(
         None, description="Path to existing chemical structure image"
     ),
-    engine: Literal["molparser", "molscribe"] = Form(
+    engine: Literal["molparser"] = Form(
         "molparser", description="OCSR engine to use"
     ),
 ):
@@ -247,12 +247,12 @@ async def generate_molfile(
     Generate a molfile from a chemical structure image.
 
     You can either upload a new image or provide the path to an existing image on the server.
-    Note: Only MolParser and MolScribe engines support molfile generation.
+    Note: Only the MolParser engine supports molfile generation.
 
     Args:
         image_file: The chemical structure image file to upload (optional)
         image_path: Path to an existing chemical structure image on the server (optional)
-        engine: OCSR engine to use (only molparser and molscribe are supported for molfile generation)
+        engine: OCSR engine to use (only molparser is supported for molfile generation)
 
     Returns:
         JSON: The generated molfile and image information
@@ -265,11 +265,11 @@ async def generate_molfile(
         )
 
     try:
-        # Validate engine (only molparser and molscribe support molfile generation)
-        if engine not in ["molparser", "molscribe"]:
+        # Validate engine (only molparser supports molfile generation)
+        if engine != "molparser":
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Only the MolParser and MolScribe engines support molfile generation",
+                detail="Only the MolParser engine supports molfile generation",
             )
 
         # Process uploaded file if provided
@@ -331,7 +331,7 @@ async def generate_both(
     image_path: Optional[str] = Form(
         None, description="Path to existing chemical structure image"
     ),
-    engine: Literal["molecode", "molparser", "molscribe"] = Form(
+    engine: Literal["molecode", "molparser"] = Form(
         "molparser", description="OCSR engine to use"
     ),
     hand_drawn: bool = Form(
@@ -342,14 +342,14 @@ async def generate_both(
     Generate both SMILES and molfile from a chemical structure image.
 
     You can either upload a new image or provide the path to an existing image on the server.
-    Note: For the 'molecode' engine, only SMILES will be generated. MolParser and MolScribe
-    engines provide both SMILES and molfile. The hand_drawn parameter is only applicable
+    Note: For the 'molecode' engine, only SMILES will be generated. The MolParser
+    engine provides both SMILES and molfile. The hand_drawn parameter is only applicable
     when using the DECIMER engine.
 
     Args:
         image_file: The chemical structure image file to upload (optional)
         image_path: Path to an existing chemical structure image on the server (optional)
-        engine: OCSR engine to use (molecode, molparser, or molscribe)
+        engine: OCSR engine to use (molecode or molparser)
         hand_drawn: Whether to use the hand-drawn model (only applicable for DECIMER)
 
     Returns:
@@ -505,7 +505,7 @@ async def generate_with_depiction(
     image_path: Optional[str] = Form(
         None, description="Path to existing chemical structure image"
     ),
-    engine: Literal["molecode", "molparser", "molscribe"] = Form(
+    engine: Literal["molecode", "molparser"] = Form(
         "molparser", description="OCSR engine to use"
     ),
     output_type: Literal["smiles", "molfile", "both"] = Form(
@@ -533,7 +533,7 @@ async def generate_with_depiction(
     Args:
         image_file: The chemical structure image file to upload (optional)
         image_path: Path to an existing chemical structure image on the server (optional)
-        engine: OCSR engine to use (molecode, molparser, or molscribe)
+        engine: OCSR engine to use (molecode or molparser)
         output_type: Type of chemical notation to generate (smiles, molfile, or both)
         hand_drawn: Whether to use the hand-drawn model (only applicable for DECIMER)
         depict_engine: Engine to use for molecular depiction (cdk or rdkit)

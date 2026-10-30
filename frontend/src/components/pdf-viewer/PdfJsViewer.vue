@@ -470,7 +470,7 @@ export default {
 
 .pdfjs-container {
     width: 100%;
-    height: calc(100% - 48px);
+    height: calc(100vh - 48px);
     overflow: auto;
     background: var(--color-bg, #f8f8f8);
     display: flex;

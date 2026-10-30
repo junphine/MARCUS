@@ -57,7 +57,6 @@ Project MARCUS is a comprehensive platform for extracting, recognizing, and proc
       <ul>
         <li><b>DECIMER</b>: SMILES generation with hand-drawn support</li>
         <li><b>MolParser</b>: SMILES and molfiles with coordinates</li>
-        <li><b>MolScribe</b>: Advanced structure recognition</li>
       </ul>
     </td>
   </tr>
@@ -252,7 +251,6 @@ This project utilizes several open-source cheminformatics tools:
 - [Chemistry Development Kit (CDK)](https://cdk.github.io/)
 - [DECIMER](https://github.com/Kohulan/DECIMER-Image_Transformer)
 - [MolParser](https://github.com/dptech-corp/MolParser)
-- [MolScribe](https://github.com/thomas0809/MolScribe)
 
 </div>
 

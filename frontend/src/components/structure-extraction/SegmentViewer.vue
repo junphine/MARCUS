@@ -404,69 +404,6 @@
                   </div>
                 </div>
 
-                <!-- MolScribe Result Card -->
-                <div class="engine-result-card" :class="{ 'result-selected': selectedEngine === 'molscribe' }">
-                  <div class="engine-header molscribe">
-                    <div class="engine-icon-container">
-                      <vue-feather type="cpu" class="engine-icon"></vue-feather>
-                    </div>
-                    <h4 class="engine-name">MolScribe</h4>
-                  </div>
-                  <div class="engine-content">
-                    <!-- Structure visualization -->
-                    <div class="structure-preview">
-                      <img v-if="molscribeResult && molscribeResult.svg"
-                        :src="'data:image/svg+xml;utf8,' + encodeURIComponent(molscribeResult.svg)" class="result-image"
-                        alt="MolScribe result" />
-                      <div v-else-if="molscribeResult && molscribeResult.error" class="error-result">
-                        <vue-feather type="alert-circle" class="error-icon"></vue-feather>
-                        <p>{{ molscribeResult.error }}</p>
-                      </div>
-                      <div v-else class="loading-structure">
-                        <vue-feather type="loader" class="loading-icon spin"></vue-feather>
-                      </div>
-                    </div>
-
-                    <!-- SMILES data -->
-                    <div v-if="molscribeResult && molscribeResult.smiles" class="smiles-data">
-                      <div class="smiles-label">SMILES:</div>
-                      <div class="smiles-value">{{ truncateText(molscribeResult.smiles, 20) }}</div>
-                      <button class="copy-btn" @click="copyEngineSmiles(molscribeResult.smiles)" title="Copy SMILES">
-                        <vue-feather type="copy" size="14"></vue-feather>
-                      </button>
-                    </div>
-
-                    <!-- Processing time -->
-                    <div v-if="molscribeResult && molscribeResult.processingTime" class="engine-stats">
-                      <div class="stat-item">
-                        <span class="stat-label">Processing Time:</span>
-                        <span class="stat-value">{{ molscribeResult.processingTime }}</span>
-                      </div>
-                      <div class="stat-item coordinates-badge" v-if="molscribeResult.molfile">
-                        <span class="coordinate-label">
-                          <vue-feather type="map-pin" size="12" class="coordinate-icon"></vue-feather>
-                          Coordinates Available
-                        </span>
-                      </div>
-                    </div>
-
-                    <!-- Selection button -->
-                    <div v-if="molscribeResult && molscribeResult.smiles && !molscribeResult.error"
-                      class="selection-actions">
-                      <button class="select-prediction-btn" :class="{ 'active': selectedEngine === 'molscribe' }"
-                        @click="selectPrediction('molscribe')">
-                        <template v-if="selectedEngine === 'molscribe'">
-                          <vue-feather type="check-circle" size="16" class="btn-icon"></vue-feather>
-                          <span>Selected</span>
-                        </template>
-                        <template v-else>
-                          <vue-feather type="check" size="16" class="btn-icon"></vue-feather>
-                          <span>Select This Result</span>
-                        </template>
-                      </button>
-                    </div>
-                  </div>
-                </div>
               </div>
             </div>
           </div>
@@ -652,7 +589,6 @@ export default {
       isComparing: false,
       decimerResult: null,
       molparserResult: null,
-      molscribeResult: null,
       isFullscreen: false,
       showContextView: false,
       contextImageUrl: null,
@@ -673,7 +609,7 @@ export default {
       hasIdenticalResults: false,
       findingMCS: false, // Property for MCS finding
       // New properties for engine selection
-      selectedEngine: null, // Will store 'molecode', 'molparser', or 'molscribe'
+      selectedEngine: null, // Will store 'molecode' or 'molparser'
       // New property to enable/disable auto analysis
       autoAnalysisEnabled: true,
       // Structure editor modal state
@@ -694,7 +630,6 @@ export default {
       const engine = this.displayedStructure.engine.toLowerCase()
       if (engine.includes('molecode')) return 'decimer-tag'
       if (engine.includes('molparser')) return 'molparser-tag'
-      if (engine.includes('molscribe')) return 'molscribe-tag'
 
       return ''
     },
@@ -715,21 +650,19 @@ export default {
 
       // Otherwise, use coordinates if:
       // 1. We have a molfile
-      // 2. The engine is MolParser or MolScribe
+      // 2. The engine is MolParser
       return !!this.displayedStructure.molfile &&
-        (this.displayedStructure.engine === 'molparser' ||
-          this.displayedStructure.engine === 'molscribe');
+        this.displayedStructure.engine === 'molparser';
     },
     // Check if all engines have loaded (either with success or error)
     allEnginesLoaded() {
-      return this.decimerResult && this.molparserResult && this.molscribeResult;
+      return this.decimerResult && this.molparserResult;
     },
     // Count engines with valid results
     validEngineCount() {
       let count = 0;
       if (this.decimerResult?.smiles && !this.decimerResult.error) count++;
       if (this.molparserResult?.smiles && !this.molparserResult.error) count++;
-      if (this.molscribeResult?.smiles && !this.molscribeResult.error) count++;
       return count;
     },
     // Check if we can compare (need at least 2 valid engines)
@@ -810,7 +743,6 @@ export default {
       this.isComparing = false;
       this.decimerResult = null;
       this.molparserResult = null;
-      this.molscribeResult = null;
       this.showContextView = false;
       this.contextImageUrl = null;
       this.isLoadingContext = false;
@@ -851,7 +783,6 @@ export default {
       const validSmiles = [];
       if (this.decimerResult?.smiles) validSmiles.push({ engine: 'molecode', smiles: this.decimerResult.smiles });
       if (this.molparserResult?.smiles) validSmiles.push({ engine: 'molparser', smiles: this.molparserResult.smiles });
-      if (this.molscribeResult?.smiles) validSmiles.push({ engine: 'molscribe', smiles: this.molscribeResult.smiles });
 
       // Need at least 2 engines with SMILES to compare
       if (validSmiles.length < 2) return;
@@ -905,21 +836,6 @@ export default {
 
           const svg = await depictionService.generateDepiction(depictionOptions);
           this.molparserResult.svg = svg;
-        }
-
-        // Update MolScribe result
-        if (this.molscribeResult?.smiles && this.molscribeResult?.molfile) {
-          const useCoords = this.useCoordinatesForDisplay;
-          const depictionOptions = {
-            engine: 'cdk',
-            smiles: this.molscribeResult.smiles,
-            molfile: useCoords ? this.molscribeResult.molfile : null,
-            useMolfileDirectly: useCoords,
-            format: 'svg'
-          };
-
-          const svg = await depictionService.generateDepiction(depictionOptions);
-          this.molscribeResult.svg = svg;
         }
       } catch (error) {
         console.error('Error updating depictions:', error);
@@ -1125,7 +1041,6 @@ export default {
       // Reset results
       this.decimerResult = null;
       this.molparserResult = null;
-      this.molscribeResult = null;
 
       // Reset similarity metrics
       this.similarityScore = 0;
@@ -1143,8 +1058,7 @@ export default {
         // Process all engines in parallel
         await Promise.all([
           this.processEngine('molecode', imagePath),
-          this.processEngine('molparser', imagePath),
-          this.processEngine('molscribe', imagePath)
+          this.processEngine('molparser', imagePath)
         ]);
 
         // Calculate quick similarity metrics once all engines have processed
@@ -1213,8 +1127,6 @@ export default {
           this.decimerResult = result;
         } else if (engine === 'molparser') {
           this.molparserResult = result;
-        } else if (engine === 'molscribe') {
-          this.molscribeResult = result;
         }
       } catch (error) {
         console.error(`Error processing with ${engine}:`, error);
@@ -1236,8 +1148,6 @@ export default {
           this.decimerResult = errorResult;
         } else if (engine === 'molparser') {
           this.molparserResult = errorResult;
-        } else if (engine === 'molscribe') {
-          this.molscribeResult = errorResult;
         }
       }
     },
@@ -1406,7 +1316,7 @@ export default {
         }
 
         // Define the engines we want to compare
-        const engines = ['molecode', 'molparser', 'molscribe'];
+        const engines = ['molecode', 'molparser'];
         const smilesList = [];
         const engineNames = [];
 
@@ -1419,11 +1329,6 @@ export default {
         if (this.molparserResult && this.molparserResult.smiles) {
           smilesList.push(this.molparserResult.smiles);
           engineNames.push(engines[1]); // molparser
-        }
-
-        if (this.molscribeResult && this.molscribeResult.smiles) {
-          smilesList.push(this.molscribeResult.smiles);
-          engineNames.push(engines[2]); // molscribe
         }
 
         // Make sure we have at least 2 engines with valid SMILES
@@ -1492,14 +1397,6 @@ export default {
             engine: 'molparser',
             smiles: this.molparserResult.smiles,
             molfile: this.molparserResult.molfile
-          });
-        }
-
-        if (this.molscribeResult?.smiles && !this.molscribeResult.error) {
-          validResults.push({
-            engine: 'molscribe',
-            smiles: this.molscribeResult.smiles,
-            molfile: this.molscribeResult.molfile
           });
         }
 
@@ -1574,8 +1471,6 @@ export default {
               this.decimerResult.svg = svgResult;
             } else if (result.engine === 'molparser' && this.molparserResult) {
               this.molparserResult.svg = svgResult;
-            } else if (result.engine === 'molscribe' && this.molscribeResult) {
-              this.molscribeResult.svg = svgResult;
             }
           } catch (error) {
             console.error(`Error updating depiction for ${result.engine}:`, error);
@@ -1633,8 +1528,7 @@ export default {
     getEngineDisplayName(engine) {
       const displayNames = {
         'molecode': 'MoleCode',
-        'molparser': 'MolParser',
-        'molscribe': 'MolScribe'
+        'molparser': 'MolParser'
       };
       return displayNames[engine] || engine;
     },
@@ -1649,8 +1543,6 @@ export default {
         selectedResult = this.decimerResult;
       } else if (this.selectedEngine === 'molparser' && this.molparserResult) {
         selectedResult = this.molparserResult;
-      } else if (this.selectedEngine === 'molscribe' && this.molscribeResult) {
-        selectedResult = this.molscribeResult;
       }
 
       if (!selectedResult || !selectedResult.smiles) {
@@ -2324,11 +2216,6 @@ export default {
                         background: linear-gradient(135deg, #a7f3d0 0%, #6ee7b7 100%);
                         border-color: rgba(16, 185, 129, 0.3);
                       }
-
-                      &.molscribe-tag {
-                        background: linear-gradient(135deg, #e9d5ff 0%, #d8b4fe 100%);
-                        border-color: rgba(123, 31, 162, 0.3);
-                      }
                     }
 
                     .icon {
@@ -2384,12 +2271,6 @@ export default {
                           background: rgba(16, 185, 129, 0.1);
                           color: #059669;
                           border: 1px solid rgba(16, 185, 129, 0.3);
-                        }
-
-                        &.molscribe-tag {
-                          background: rgba(123, 31, 162, 0.1);
-                          color: #7c2d92;
-                          border: 1px solid rgba(123, 31, 162, 0.3);
                         }
                       }
                     }
@@ -2871,12 +2752,6 @@ export default {
                     background-color: rgba(7, 150, 112, 0.1);
                     color: #05742c;
                     border: 1px solid rgba(14, 165, 233, 0.3);
-                  }
-
-                  &.molscribe-tag {
-                    background-color: rgba(123, 31, 162, 0.1);
-                    color: #7B1FA2;
-                    border: 1px solid rgba(123, 31, 162, 0.3);
                   }
                 }
 
@@ -3382,20 +3257,6 @@ export default {
                     .engine-icon {
                       color: #0ee9a7;
                       filter: drop-shadow(0 2px 4px rgba(14, 165, 233, 0.3));
-                    }
-                  }
-
-                  &.molscribe {
-                    background: linear-gradient(135deg, rgba(168, 85, 247, 0.15) 0%, rgba(168, 85, 247, 0.25) 100%);
-                    border-bottom: 2px solid rgba(168, 85, 247, 0.4);
-
-                    &:before {
-                      background: radial-gradient(circle at top right, rgba(168, 85, 247, 0.3), transparent 70%);
-                    }
-
-                    .engine-icon {
-                      color: #a855f7;
-                      filter: drop-shadow(0 2px 4px rgba(168, 85, 247, 0.3));
                     }
                   }
 

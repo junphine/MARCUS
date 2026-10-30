@@ -225,8 +225,7 @@
         
         const engineMap = {
           'molecode': 'MoleCode',
-          'molparser': 'MolParser',
-          'molscribe': 'MolScribe'
+          'molparser': 'MolParser'
         };
         
         return engineMap[engine.toLowerCase()] || engine;

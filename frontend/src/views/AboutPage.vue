@@ -219,22 +219,6 @@
                 <div class="icon-glow"></div>
               </div>
               <div class="publication-info">
-                <h4>MolScribe: Robust molecular structure recognition with image-to-graph generation</h4>
-                <p class="publication-authors">Qian Y., Guo J., Tu Z., Li Z., Coley C.W., Barzilay R.</p>
-                <p class="publication-journal">J Chem Inf Model, 63(7):1925–34 (2023)</p>
-                <a href="https://doi.org/10.1021/acs.jcim.2c01480" target="_blank" class="publication-link">
-                  <vue-feather type="external-link" size="14"></vue-feather>
-                  <span>doi.org/10.1021/acs.jcim.2c01480</span>
-                </a>
-              </div>
-            </div>
-            <div class="publication hover-card">
-              <div class="card-highlight"></div>
-              <div class="publication-icon">
-                <vue-feather type="file-text" size="24"></vue-feather>
-                <div class="icon-glow"></div>
-              </div>
-              <div class="publication-info">
                 <h4>Docling: Document-level Pretraining for Scientific PDF Understanding</h4>
                 <p class="publication-authors">Auer C., Lysak M., Nassar A., Dolfi M., Livathinos N., Vagenas P., et al.
                 </p>

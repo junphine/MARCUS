@@ -15,16 +15,14 @@ IMAGES_DIR = os.path.join(UPLOAD_DIR, "chem_images")
 os.makedirs(IMAGES_DIR, exist_ok=True)
 
 
-_molscribe_model = None
 _molparser_model = None
 _DETECTOR = None
-_RECOGNIZER = None
 
 
 def _get_detector():
     global _DETECTOR
     if _DETECTOR is None:
-        # Ultralytics + MolScribe both print startup chatter to stdout.
+        # Ultralytics prints startup chatter to stdout.
         # stdout is our JSON channel — redirect any library noise to
         # stderr so the parent only ever reads JSON lines.
         with contextlib.redirect_stdout(sys.stderr):
@@ -36,20 +34,6 @@ def _get_detector():
             )
             _DETECTOR = YOLO(ckpt+os.sep+"moldet_v2_yolo11n_960_doc.pt")
     return _DETECTOR
-
-
-def _get_recognizer():
-    global _RECOGNIZER
-    if _RECOGNIZER is None:
-        with contextlib.redirect_stdout(sys.stderr):
-            from molscribe import MolScribe
-            from modelscope import snapshot_download
-            ckpt = snapshot_download(
-                repo_id="polyai/MolScribe",
-                allow_file_pattern="swin_base_char_aux_1m.pth",
-            )
-            _RECOGNIZER = MolScribe(ckpt+os.sep+"swin_base_char_aux_1m.pth", device=None)
-    return _RECOGNIZER
 
 
 
@@ -160,93 +144,6 @@ def get_molparser_prediction(
 
 
 
-def init_molscribe(ckpt_path=None):
-    """
-    Initialize the MolScribe model.
-
-    Args:
-        ckpt_path: Path to checkpoint to use, if None then will use default
-
-    Returns:
-        MolScribe: Initialized MolScribe model instance
-    """
-    from molscribe import MolScribe
-    global _molscribe_model
-
-    if _molscribe_model is not None:
-        return _molscribe_model
-
-    try:
-        if MolScribe is None:
-            raise ImportError("MolScribe is not installed")
-
-        _molscribe_model = _get_recognizer()
-        if _molscribe_model:
-            return _molscribe_model
-
-        if ckpt_path is None:
-            from huggingface_hub import hf_hub_download
-            ckpt_path = hf_hub_download("yujieq/MolScribe", "swin_base_char_aux_1m.pth")
-
-        _molscribe_model = MolScribe(ckpt_path, device=torch.device("cpu"))
-        return _molscribe_model
-    except Exception as e:
-        raise RuntimeError(f"Failed to initialize MolScribe model: {str(e)}")
-
-
-def get_molscribe_prediction(
-    path: Union[str, Path], data_type: Literal["smiles", "molfile", "both"] = "both"
-) -> Union[Tuple[str, str], Tuple[str, str, str]]:
-    """
-    Get predictions from MolScribe model for a given image path.
-
-    Args:
-        path: Path to the chemical structure image.
-        data_type: Type of data to return. Options:
-                   "smiles" - Return only SMILES string
-                   "molfile" - Return only molfile
-                   "both" - Return both SMILES and molfile
-
-    Returns:
-        If data_type is "smiles":
-            A tuple containing (image_name, smiles_string)
-        If data_type is "molfile":
-            A tuple containing (image_name, molfile_string)
-        If data_type is "both":
-            A tuple containing (image_name, smiles_string, molfile_string)
-
-    Raises:
-        FileNotFoundError: If the specified path does not exist.
-        ValueError: If an invalid data_type is provided.
-    """
-    path = Path(path)
-    if not path.exists():
-        raise FileNotFoundError(f"Image file not found: {path}")
-
-    image_name = path.name
-
-    # Initialize model if needed
-    model = init_molscribe()
-
-    # Get prediction
-    try:
-        with torch.no_grad():
-            prediction = model.predict_image_file(str(path))
-
-            smiles = prediction.get("smiles", "")
-            molfile = prediction.get("molfile", "")
-
-            # Return results based on data_type
-            if data_type == "smiles":
-                return image_name, smiles
-            elif data_type == "molfile":
-                return image_name, molfile
-            else:  # data_type == "both"
-                return image_name, smiles, molfile
-    except Exception as e:
-        raise RuntimeError(f"Error in MolScribe prediction: {str(e)}")
-
-
 def save_uploaded_image(file_content: bytes, filename: str) -> str:
     """
     Save an uploaded image to the images directory with a unique filename
@@ -275,7 +172,7 @@ def save_uploaded_image(file_content: bytes, filename: str) -> str:
 
 def process_chemical_structure(
     file_path: str,
-    engine: Literal["molecode", "molparser", "molscribe"] = "molecode",
+    engine: Literal["molecode", "molparser"] = "molecode",
     output_type: Literal["smiles", "molfile", "both"] = "smiles",
     hand_drawn: bool = False,
 ) -> Dict[str, Any]:
@@ -292,42 +189,8 @@ def process_chemical_structure(
         Dict: Results including image name, SMILES, and/or molfile
     """
     try:
-        # Add support for MolScribe engine
-        if engine == "molscribe":
-            if output_type == "smiles":
-                image_name, smiles = get_molscribe_prediction(
-                    file_path, data_type="smiles"
-                )
-                return {
-                    "image_name": image_name,
-                    "smiles": smiles,
-                    "engine": engine,
-                    "hardware": f"CPU (PyTorch)",
-                }
-            elif output_type == "molfile":
-                image_name, molfile = get_molscribe_prediction(
-                    file_path, data_type="molfile"
-                )
-                return {
-                    "image_name": image_name,
-                    "molfile": molfile,
-                    "engine": engine,
-                    "hardware": f"CPU (PyTorch)",
-                }
-            else:  # output_type == "both"
-                image_name, smiles, molfile = get_molscribe_prediction(
-                    file_path, data_type="both"
-                )
-                return {
-                    "image_name": image_name,
-                    "smiles": smiles,
-                    "molfile": molfile,
-                    "engine": engine,
-                    "hardware": f"CPU (PyTorch)",
-                }
-
         # MolParser processing
-        elif engine == "molparser":
+        if engine == "molparser":
             # Report hardware info if available
             try:
                 if torch.cuda.is_available():
@@ -381,7 +244,7 @@ def process_chemical_structure(
 
         else:
             raise ValueError(
-                f"Unsupported engine: {engine}. Choose 'molecode', 'molparser', or 'molscribe'."
+                f"Unsupported engine: {engine}. Choose 'molecode' or 'molparser'."
             )
 
     except Exception as e:

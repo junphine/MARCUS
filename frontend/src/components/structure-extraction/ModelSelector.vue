@@ -78,42 +78,6 @@
           <div class="model-tooltip">End-to-end visual recognition model for molecular structures in the wild</div>
         </div>
       </div>
-
-      <!-- MolScribe Model -->
-      <div 
-        class="model-button"
-        :class="{ 
-          active: modelValue === 'molscribe',
-          disabled: disabled 
-        }"
-        @click="selectModel('molscribe')"
-        role="button"
-        tabindex="0"
-        @keydown.enter="selectModel('molscribe')"
-        @keydown.space="selectModel('molscribe')"
-      >
-        <input 
-          type="radio" 
-          id="molscribe" 
-          name="model" 
-          value="molscribe"
-          :checked="modelValue === 'molscribe'"
-          :disabled="disabled"
-          class="model-radio"
-        />
-        
-        <div class="model-icon molscribe-icon">
-          <vue-feather type="edit-3" class="icon"></vue-feather>
-        </div>
-        
-        <div class="model-content">
-          <div class="model-name">
-            MolScribe
-            <span class="info-icon">i</span>
-          </div>
-          <div class="model-tooltip">Swin Transformer based image to graph generation with state-of-the-art performance</div>
-        </div>
-      </div>
     </div>
     
     <!-- Configuration Section -->
@@ -135,8 +99,8 @@
         </div>
       </div>
       
-      <!-- MolParser & MolScribe Options -->
-      <div v-if="modelValue === 'molparser' || modelValue === 'molscribe'" class="config-group">
+      <!-- MolParser Options -->
+      <div v-if="modelValue === 'molparser'" class="config-group">
         <div class="toggle-option">
           <div class="toggle-switch" @click="toggleCoordinates">
             <div 
@@ -186,7 +150,7 @@ export default {
         this.handDrawn = false;
         this.includeCoordinates = false; // MoleCode doesn't use coordinates
       } else {
-        // For MolParser and MolScribe, default to using coordinates
+        // For MolParser, default to using coordinates
         this.includeCoordinates = true;
       }
       this.updateOptions();
@@ -210,7 +174,7 @@ export default {
       if (model === 'molecode') {
         this.includeCoordinates = false; // MoleCode doesn't support molfiles
       } else {
-        // Default to using coordinates for MolParser and MolScribe
+        // Default to using coordinates for MolParser
         this.includeCoordinates = true;
       }
       
@@ -278,7 +242,7 @@ export default {
 
   .model-button {
     flex: 1;
-    max-width: 220px;
+    max-width: 320px;
     min-width: 160px;
     background: rgba(255, 255, 255, 0.9);
     border: 2px solid rgba(226, 232, 240, 0.8);
@@ -358,10 +322,6 @@ export default {
 
       &.molparser-icon {
         background: linear-gradient(135deg, #059669 0%, #047857 100%);
-      }
-
-      &.molscribe-icon {
-        background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
       }
     }
 

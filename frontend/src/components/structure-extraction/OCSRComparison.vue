@@ -152,8 +152,7 @@ export default {
       useCoordinatesForDepiction: true, // Default to using coordinates for better depiction
       results: [
         { engine: 'molecode', smiles: '', molfile: null, error: null, processingTime: null, useCoordinates: false },
-        { engine: 'molparser', smiles: '', molfile: null, error: null, processingTime: null, useCoordinates: true },
-        { engine: 'molscribe', smiles: '', molfile: null, error: null, processingTime: null, useCoordinates: true }
+        { engine: 'molparser', smiles: '', molfile: null, error: null, processingTime: null, useCoordinates: true }
       ],
       mcsResult: null,
       mcsSmarts: '',
@@ -176,14 +175,12 @@ export default {
     engineClass(engine) {
       return {
         'molecode-engine': engine === 'molecode',
-        'molparser-engine': engine === 'molparser',
-        'molscribe-engine': engine === 'molscribe'
+        'molparser-engine': engine === 'molparser'
       };
     },
     engineIcon(engine) {
       if (engine === 'molecode') return 'llm';
       if (engine === 'molparser') return 'grid';
-      if (engine === 'molscribe') return 'edit-3';
       return 'box';
     },
     shouldUseCoordinates(result) {
@@ -319,8 +316,8 @@ export default {
       });
       
       try {
-        // Process segment with all three engines in parallel
-        const engines = ['molecode', 'molparser', 'molscribe'];
+        // Process segment with both engines in parallel
+        const engines = ['molecode', 'molparser'];
         const processPromises = engines.map(engine => this.processWithEngine(engine));
         
         await Promise.all(processPromises);
@@ -345,7 +342,7 @@ export default {
         
         console.log(`Processing segment with ${engine} engine: ${imagePath}`);
         
-        // Always include molfile for MolParser and MolScribe for comparison purposes
+        // Always include molfile for MolParser for comparison purposes
         const includeMolfile = engine !== 'molecode';
         
         // Process the segment using ocsrService
@@ -422,7 +419,7 @@ export default {
     useCoordinatesForDepiction(newValue) {
       // Update the useCoordinates property of each result when the global setting changes
       this.results.forEach(result => {
-        // Only change for MolParser and MolScribe
+        // Only change for MolParser
         if (result.engine !== 'molecode') {
           result.useCoordinates = newValue;
         }
@@ -558,20 +555,12 @@ export default {
         
         &.molparser-engine {
           background-color: rgba(0, 122, 255, 0.1);
-          
+
           .engine-icon {
             color: #007aff;
           }
         }
-        
-        &.molscribe-engine {
-          background-color: rgba(37, 99, 235, 0.1);
-          
-          .engine-icon {
-            color: #2563eb;
-          }
-        }
-        
+
         .engine-title {
           margin: 0;
           font-size: 1rem;

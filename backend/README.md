@@ -49,7 +49,7 @@ The backend offers RESTful APIs for:
 app/
 ├── routers/              # API endpoint definitions
 ├── modules/              # Core business logic
-│   ├── ocsr_wrapper.py       # DECIMER, MolParser, MolScribe
+│   ├── ocsr_wrapper.py       # DECIMER, MolParser
 │   ├── depiction.py          # CDK molecular visualization
 │   ├── openai_wrapper.py     # AI text analysis
 │   ├── session_manager.py    # User concurrency control
@@ -63,7 +63,6 @@ app/
 
 1. **DECIMER**: Deep learning for chemical structure recognition
 2. **MolParser**: End-to-end visual recognition of molecule structures
-3. **MolScribe**: Advanced handwritten structure support
 
 ## Development Setup
 

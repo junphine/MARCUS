@@ -7,33 +7,32 @@
       <vue-feather type="alert-triangle" class="icon warning-icon"></vue-feather>
       <span>Note: We are still optimizing our workflows. If you experience timeouts, please try again.</span>
     </div>
-    
-    <div class="columns-container" ref="columnsContainer">
-      <!-- Column 1: PDF Upload and Visualization -->
+    <div class="columns-container" ref="uploadContainer">
+       <!-- Column 1: PDF Upload -->
       <div class="column pdf-column" :style="{ width: columnWidths[0] + 'px' }">
         <div class="panel">
           <h2 class="panel-title">
             <vue-feather type="file-text" class="icon"></vue-feather>
             Document Upload
           </h2>
-          <PdfUploadPanel 
-            @pdf-uploaded="handlePdfUploaded" 
-            :isLoading="isLoadingPdf" 
+          <PdfUploadPanel
+            @pdf-uploaded="handlePdfUploaded"
+            :isLoading="isLoadingPdf"
           />
-          
+
           <!-- MOVED: Prominent Action Buttons - Now placed before the PDF viewer -->
           <div class="action-buttons prominent" v-if="pdfUrl">
-            <button 
-              class="btn btn-primary btn-large" 
+            <button
+              class="btn btn-primary btn-large"
               @click="extractText"
               :disabled="isExtractingText"
             >
               <vue-feather type="align-left" class="icon"></vue-feather>
               {{ isExtractingText ? 'Extracting Text...' : 'Extract Text' }}
             </button>
-            
-            <button 
-              class="btn btn-primary btn-large" 
+
+            <button
+              class="btn btn-primary btn-large"
               @click="extractStructures"
               :disabled="isExtractingStructures"
             >
@@ -41,22 +40,29 @@
               {{ isExtractingStructures ? 'Extracting Structures...' : 'Extract Structures' }}
             </button>
           </div>
-          
-          <div class="pdf-viewer-container" v-if="pdfUrl">
-            <PdfViewerObject :pdfUrl="pdfUrl" :pdfFile="pdfFile" />
-          </div>
         </div>
-        
+
         <!-- Column Resizer 1 -->
-        <div 
+        <div
           class="column-resizer"
           @mousedown.prevent="startResize($event, 0)"
           @touchstart.prevent="startResizeTouch($event, 0)"
         ></div>
       </div>
+      <!-- Column 2: PDF Visualization -->
+      <div class="column pdf-column" :style="{ width: columnWidths[1] + 'px' }">
+        <div class="panel">
+            <div class="pdf-viewer-container" v-if="pdfUrl">
+              <PdfViewerObject :pdfUrl="pdfUrl" :pdfFile="pdfFile" />
+            </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="columns-container" ref="columnsContainer">
       
-      <!-- Column 2: Text and Annotations -->
-      <div class="column text-column" :style="{ width: columnWidths[1] + 'px' }">
+      <!-- Column 1: Text and Annotations -->
+      <div class="column text-column" :style="{ width: columnWidths[0] + 'px' }">
         <div class="panel">
           <h2 class="panel-title">
             <vue-feather type="type" class="icon"></vue-feather>
@@ -74,13 +80,13 @@
         <!-- Column Resizer 2 -->
         <div 
           class="column-resizer"
-          @mousedown.prevent="startResize($event, 1)"
-          @touchstart.prevent="startResizeTouch($event, 1)"
+          @mousedown.prevent="startResize($event, 0)"
+          @touchstart.prevent="startResizeTouch($event, 0)"
         ></div>
       </div>
       
-      <!-- Column 3: Chemical Structures -->
-      <div class="column structures-column" :style="{ width: columnWidths[2] + 'px' }">
+      <!-- Column 2: Chemical Structures -->
+      <div class="column structures-column" :style="{ width: columnWidths[1] + 'px' }">
         <div class="panel">
           <div class="panel-header">
             <h2 class="panel-title">
@@ -531,11 +537,11 @@ export default {
         this.columnWidths = [containerWidth, containerWidth, containerWidth];
       } else {
         // In desktop view, distribute the width evenly
-        const colWidth = Math.max(this.minColumnWidth, Math.floor(containerWidth / 3));
+        const colWidth = Math.max(this.minColumnWidth, Math.floor(containerWidth / 2));
         this.columnWidths = [colWidth, colWidth, colWidth];
         
         // Adjust last column to take remaining space
-        const totalAllocated = colWidth * 2;
+        const totalAllocated = colWidth;
         const remaining = containerWidth - totalAllocated;
         if (remaining >= this.minColumnWidth) {
           this.columnWidths[2] = remaining;
@@ -561,12 +567,13 @@ export default {
       const ratio = newTotalWidth / this.totalWidth;
       
       // Ensure minimum widths and adjust proportionally
-      let totalDesiredWidth = 0;
+
       const desiredWidths = this.columnWidths.map(width => {
         const newWidth = Math.max(this.minColumnWidth, Math.floor(width * ratio));
-        totalDesiredWidth += newWidth;
         return newWidth;
       });
+
+      let totalDesiredWidth = desiredWidths[0]+desiredWidths[1];
       
       // If the total width doesn't match the container width, adjust the last column
       if (totalDesiredWidth !== newTotalWidth && totalDesiredWidth > 0) {
@@ -579,7 +586,7 @@ export default {
           desiredWidths[lastIndex] = adjustedLastCol;
         } else {
           // If last column can't be adjusted, distribute among all columns
-          const perColumnAdjustment = Math.floor(diff / desiredWidths.length);
+          const perColumnAdjustment = Math.floor(diff / 2);
           for (let i = 0; i < desiredWidths.length; i++) {
             desiredWidths[i] = Math.max(this.minColumnWidth, desiredWidths[i] + perColumnAdjustment);
           }
@@ -659,15 +666,7 @@ export default {
       newCol1Width = Math.max(this.minColumnWidth, newCol1Width);
       newCol2Width = Math.max(this.minColumnWidth, newCol2Width);
       
-      // Make sure we're not exceeding the container width
-      const otherColsWidth = newWidths.reduce((sum, width, index) => {
-        if (index !== this.currentResizer && index !== this.currentResizer + 1) {
-          return sum + width;
-        }
-        return sum;
-      }, 0);
-      
-      const maxAvailableWidth = containerWidth - otherColsWidth;
+      const maxAvailableWidth = containerWidth;
       
       // If the combined width is too large, adjust to fit
       if (newCol1Width + newCol2Width > maxAvailableWidth) {
@@ -995,7 +994,7 @@ export default {
     const depictionOptions = {
       smiles: structure.smiles,
       molfile: structure.molfile,
-      useMolfileDirectly: !!structure.molfile && (structure.engine === 'molparser' || structure.engine === 'molscribe'),
+      useMolfileDirectly: !!structure.molfile && structure.engine === 'molparser',
       format: 'svg',
       width: 300,
       height: 300
@@ -1936,11 +1935,11 @@ getStoredDOI() {
       width: 90vw;
       
       @media (min-width: 768px) {
-        width: 80vw;
+        width: 90vw;
       }
       
       @media (min-width: 1024px) {
-        width: 70vw;
+        width: 80vw;
       }
       
       @media (min-width: 1280px) {
@@ -2233,16 +2232,15 @@ getStoredDOI() {
   50% { transform: translateY(-5px); }
 }
 
-.pdf-viewer-container {
+.pdf-viewer-container  {
   margin-top: 0.5rem;
   flex-grow: 1;
   display: flex;
   flex-direction: column;
   /* Give the viewer a full-height area of its own now that the page scrolls,
-     instead of being squeezed into the leftover space of the panel */
-  height: calc(100vh - 253px);
-  min-height: 500px;
-  overflow: hidden;
+       instead of being squeezed into the leftover space of the panel */
+  max-height: calc(100vh + 80px);
+  overflow: auto;
 }
 
 /* UPDATED: Action buttons styling to make them more prominent */

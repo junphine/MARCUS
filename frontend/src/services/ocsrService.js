@@ -23,7 +23,7 @@ const ocsrService = {
    * @param {File|null} imageFile - The chemical structure image file (optional)
    * @param {string|null} imagePath - Path to an existing image on the server (optional)
    * @param {Object} options - Processing options
-   * @param {string} options.engine - OCSR engine to use ('molecode', 'molparser', or 'molscribe')
+   * @param {string} options.engine - OCSR engine to use ('molecode' or 'molparser')
    * @param {boolean} options.handDrawn - Whether to use the hand-drawn model (only for MoleCode)
    * @returns {Promise} - Promise with the generated SMILES data
    */
@@ -71,7 +71,7 @@ const ocsrService = {
    * @param {File|null} imageFile - The chemical structure image file (optional)
    * @param {string|null} imagePath - Path to an existing image on the server (optional)
    * @param {Object} options - Processing options
-   * @param {string} options.engine - OCSR engine to use ('molparser' or 'molscribe')
+   * @param {string} options.engine - OCSR engine to use ('molparser')
    * @returns {Promise} - Promise with the generated molfile data
    */
   generateMolfile: async (imageFile = null, imagePath = null, options = {}) => {
@@ -86,7 +86,7 @@ const ocsrService = {
       throw new Error('Either imageFile or imagePath must be provided')
     }
     
-    // MolParser and MolScribe engines support molfile generation
+    // The MolParser engine supports molfile generation
     formData.append('engine', options.engine || 'molparser')
     
     // Use multipart/form-data for file uploads
@@ -110,7 +110,7 @@ const ocsrService = {
    * @param {File|null} imageFile - The chemical structure image file (optional)
    * @param {string|null} imagePath - Path to an existing image on the server (optional)
    * @param {Object} options - Processing options
-   * @param {string} options.engine - OCSR engine to use ('molecode', 'molparser', or 'molscribe')
+   * @param {string} options.engine - OCSR engine to use ('molecode' or 'molparser')
    * @param {boolean} options.handDrawn - Whether to use the hand-drawn model (only for MoleCode)
    * @returns {Promise} - Promise with both SMILES and molfile data
    */
@@ -154,7 +154,7 @@ const ocsrService = {
    * @param {File|null} imageFile - The chemical structure image file (optional)
    * @param {string|null} imagePath - Path to an existing image on the server (optional)
    * @param {Object} options - Processing options
-   * @param {string} options.engine - OCSR engine to use ('molecode', 'molparser', or 'molscribe')
+   * @param {string} options.engine - OCSR engine to use ('molecode' or 'molparser')
    * @param {boolean} options.handDrawn - Whether to use the hand-drawn model (only for MoleCode)
    * @param {string} options.depictEngine - Depiction engine to use ('rdkit' or 'cdk')
    * @param {string} options.depictFormat - Depiction format ('svg', 'png', or 'base64')
@@ -180,8 +180,8 @@ const ocsrService = {
     // When includeMolfile is true, use 'molfile' or 'both' as output_type depending on engine
     const useCoordinates = options.includeMolfile === true;
     
-    // For MolParser and MolScribe with coordinates, set output_type to molfile or both
-    if (useCoordinates && (options.engine === 'molparser' || options.engine === 'molscribe')) {
+    // For MolParser with coordinates, set output_type to molfile or both
+    if (useCoordinates && options.engine === 'molparser') {
       formData.append('output_type', 'both');
     } else {
       // For DECIMER or when not using coordinates, just get SMILES
@@ -311,9 +311,9 @@ const ocsrService = {
  * Process multiple segments with OCSR
  * @param {Array} segments - Array of segment objects with imageUrl or path
  * @param {Object} options - Processing options
- * @param {string} options.engine - OCSR engine to use ('molecode', 'molparser', or 'molscribe')
+ * @param {string} options.engine - OCSR engine to use ('molecode' or 'molparser')
  * @param {boolean} options.handDrawn - Whether to use the hand-drawn model (only for MoleCode)
- * @param {boolean} options.includeMolfile - Whether to include molfile data (for molparser and molscribe)
+ * @param {boolean} options.includeMolfile - Whether to include molfile data (for molparser)
  * @param {string} options.pdfId - Unique ID for the current PDF to prevent mixing structures
  * @returns {Promise} - Promise with array of processed structures
  */
@@ -327,7 +327,7 @@ processSegments: async (segments, options = {}) => {
   
   // Determine if we should get and use coordinates (molfile)
   const useCoordinates = options.includeMolfile === true && 
-                         (options.engine === 'molparser' || options.engine === 'molscribe');
+                         options.engine === 'molparser';
   
   console.log(`Using coordinates: ${useCoordinates}`);
   

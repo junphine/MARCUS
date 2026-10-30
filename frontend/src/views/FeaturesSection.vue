@@ -65,7 +65,7 @@
           </div>
           <h3 class="feature-title">Optical Chemical Structure Recognition</h3>
           <p class="feature-description">
-            Convert visual chemical structures into machine-readable formats (SMILES, molfiles) using state-of-the-art OCSR engines including DECIMER, MolScribe and MolParser.
+            Convert visual chemical structures into machine-readable formats (SMILES, molfiles) using state-of-the-art OCSR engines including DECIMER and MolParser.
           </p>
           <div class="feature-footer">
             <button class="feature-link" @click="showOcsrInfo">
@@ -159,10 +159,6 @@
           <div class="tech-logo">
             <span class="tech-img decimer-logo"></span>
             <span class="tech-name">MoleCode</span>
-          </div>
-          <div class="tech-logo">
-            <span class="tech-img molscribe-logo"></span>
-            <span class="tech-name">MolScribe</span>
           </div>
           <div class="tech-logo">
             <span class="tech-img molparser-logo"></span>
@@ -734,10 +730,6 @@ export default {
         
         &.decimer-logo {
           background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Ccircle cx='24' cy='24' r='20' fill='%233461ff'/%3E%3Cpath d='M16 16 L32 16 L32 32 L16 32 Z' fill='none' stroke='white' stroke-width='2'/%3E%3Cpath d='M20 20 L28 20 L28 28 L20 28 Z' fill='white'/%3E%3C/svg%3E");
-        }
-        
-        &.molscribe-logo {
-          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Ccircle cx='24' cy='24' r='20' fill='%233461ff'/%3E%3Cpath d='M20 18 L28 18 L32 28 L24 32 L16 28 Z' fill='none' stroke='white' stroke-width='2'/%3E%3Cpath d='M24 16 L24 32' stroke='white' stroke-width='2'/%3E%3Cpath d='M36 16 L32 20 L32 28' stroke='white' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
         }
         
         &.molparser-logo {

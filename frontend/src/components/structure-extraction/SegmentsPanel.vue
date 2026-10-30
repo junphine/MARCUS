@@ -199,7 +199,7 @@ export default {
       imageSuccess: {},
       selectedSegment: null,
       isProcessingSegment: false,
-      comparisonEngines: ['molecode', 'molparser', 'molscribe'],
+      comparisonEngines: ['molecode', 'molparser'],
       showDebugInfo: process.env.NODE_ENV === 'development' || false,
       // Track processedStructuresMap by filename
       processedStructuresMap: new Map(),
@@ -401,10 +401,10 @@ export default {
     updateModelOptions(options) {
       this.modelOptions = { ...this.modelOptions, ...options }
 
-      // Auto-enable includeMolfile for molparser and molscribe engines
+      // Auto-enable includeMolfile for the molparser engine
       if (options.model) {
         const engine = options.model
-        if (engine === 'molparser' || engine === 'molscribe') {
+        if (engine === 'molparser') {
           this.modelOptions.includeMolfile = true
         }
       }
@@ -596,7 +596,7 @@ export default {
           engine: this.selectedModel,
           handDrawn: this.modelOptions.handDrawn,
           includeMolfile: this.modelOptions.includeMolfile ||
-            (this.selectedModel === 'molparser' || this.selectedModel === 'molscribe')
+            this.selectedModel === 'molparser'
         }
 
         // Process the segment with OCSR service
@@ -620,7 +620,7 @@ export default {
           name: segment.filename, // IMPORTANT: This is used for matching
           pdfId: pdfId,
           useCoordinates: options.includeMolfile &&
-            (options.engine === 'molparser' || options.engine === 'molscribe'),
+            options.engine === 'molparser',
           processId: processId,
           timestamp: new Date().toISOString()
         }
@@ -824,7 +824,7 @@ export default {
 
       // Check if we have molfile data and if it's a coordinate-capable engine
       const hasValidMolfile = !!structure.molfile
-      const isCoordinateCapableEngine = structure.engine === 'molparser' || structure.engine === 'molscribe'
+      const isCoordinateCapableEngine = structure.engine === 'molparser'
       
       if (!hasValidMolfile || !isCoordinateCapableEngine) {
         return false
@@ -861,8 +861,7 @@ export default {
 
       const displayNames = {
         'molecode': 'MolCode',
-        'molparser': 'MolParser',
-        'molscribe': 'MolScribe'
+        'molparser': 'MolParser'
       };
 
       return displayNames[engine.toLowerCase()] || engine;
