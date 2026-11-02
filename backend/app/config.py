@@ -64,6 +64,12 @@ SECRET_KEY = validated_env["SECRET_KEY"]
 OPENAI_API_KEY = validated_env["OPENAI_API_KEY"]
 OPENAI_MODEL_ID = validated_env.get("OPENAI_MODEL_ID", "gpt-4")
 
+# QwenPaw Agent configuration (document chat feature)
+QWENPAW_BASE_URL = os.getenv("QWENPAW_BASE_URL", "http://localhost:8088")
+QWENPAW_AGENT_ID = os.getenv("QWENPAW_AGENT_ID", "default")
+QWENPAW_USERNAME = os.getenv("QWENPAW_USERNAME") or None
+QWENPAW_PASSWORD = os.getenv("QWENPAW_PASSWORD") or None
+
 # CORS configuration
 CORS_ORIGINS = get_cors_origins()
 print(f"✅ Configuration loaded:")

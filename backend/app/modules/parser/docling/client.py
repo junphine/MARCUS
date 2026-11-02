@@ -41,7 +41,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from urllib.parse import quote
 
-from ._common import (
+from .._common import (
     download_deadline_seconds,
     download_max_bytes,
     download_timeout,

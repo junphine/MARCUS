@@ -13,7 +13,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 
-from ._common import compute_size_and_hash
+from .._common import compute_size_and_hash
 from .._manifest import (
     MANIFEST_FILENAME,
     Manifest,

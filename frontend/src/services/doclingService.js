@@ -24,7 +24,10 @@ const doclingService = {
     const config = {
       headers: {
         'Content-Type': 'multipart/form-data'
-      }
+      },
+      // Full-document docling conversion is slow for large PDFs
+      // (e.g. a 125-page document takes ~10 minutes)
+      timeout: 1800000 // 30 minutes
     }
     
     try {

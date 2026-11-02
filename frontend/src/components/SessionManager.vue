@@ -106,11 +106,22 @@
 
     <!-- Active Session - Show main app -->
     <div v-else-if="isActive" class="active-session">
-      <div class="session-indicator">
+      <div
+        class="session-indicator"
+        :class="{ 'chat-open': showChat }"
+        @click="showChat = !showChat"
+        title="Chat with MARCUS about the current document"
+        role="button"
+        tabindex="0"
+        @keydown.enter="showChat = !showChat"
+      >
         <span class="status-dot"></span>
         <span>MARCUS Active</span>
         <span class="session-timer">{{ formatTime(sessionDuration) }}</span>
+        <vue-feather type="message-circle" size="16" class="chat-toggle-icon"></vue-feather>
       </div>
+      <!-- Document chat dialog -->
+      <ChatPanel :visible="showChat" @close="showChat = false" />
       <!-- Main app content goes here -->
       <slot name="main-content"></slot>
     </div>
@@ -119,9 +130,13 @@
 
 <script>
 import sessionService from '@/services/sessionService';
+import ChatPanel from '@/components/common/ChatPanel.vue';
 
 export default {
   name: 'SessionManager',
+  components: {
+    ChatPanel
+  },
   data() {
     return {
       isInitializing: true,
@@ -129,6 +144,7 @@ export default {
       isActive: false,
       hasConnectionError: false,
       isRefreshing: false,
+      showChat: false,
       
       // Session data
       sessionStatus: null,
@@ -776,6 +792,23 @@ export default {
   z-index: 1000;
   box-shadow: var(--shadow-md);
   border: 1px solid var(--color-border);
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s ease;
+}
+
+.session-indicator:hover {
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-1px);
+}
+
+.session-indicator.chat-open {
+  border-color: var(--color-primary);
+}
+
+.session-indicator .chat-toggle-icon {
+  color: var(--color-primary);
 }
 
 .status-dot {

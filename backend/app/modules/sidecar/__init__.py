@@ -12,7 +12,7 @@ See :func:`lightrag.sidecar.writer.write_sidecar` for the entry point.
 
 from typing import TYPE_CHECKING
 
-from lightrag.sidecar.ir import (
+from .ir import (
     AssetSpec,
     IRBlock,
     IRDoc,

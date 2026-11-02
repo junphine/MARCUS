@@ -52,7 +52,7 @@ from app.modules.parser._markdown import (
     render_heading_line,
     strip_heading_markdown_prefix,
 )
-from ._common import env_json,logger
+from .._common import env_json,logger
 from .manifest import select_main_json
 from app.modules.sidecar.ir import (
     AssetSpec,

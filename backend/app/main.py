@@ -26,6 +26,7 @@ from .routers import depiction_router
 from .routers import similarity_router
 from .routers import session_router
 from .routers import detector_worker
+from .routers import chat_router
 from app.exception_handlers import input_exception_handler
 from app.exception_handlers import InvalidInputException
 from app.middleware.session_middleware import SessionMiddleware
@@ -62,6 +63,7 @@ app.include_router(ocsr_engine.router)
 app.include_router(depiction_router.router)
 app.include_router(similarity_router.router)
 app.include_router(detector_worker.router)
+app.include_router(chat_router.router)
 
 app = VersionedFastAPI(
     app,
