@@ -246,8 +246,8 @@ const ocsrService = {
       }
     }
     
-    // Check if the path contains "all_segments" - if not, try to reconstruct it
-    if (!path.includes('all_segments') && path.includes('/')) {
+    // Check if the path contains "images" - if not, try to reconstruct it
+    if (!path.includes('images') && path.includes('/')) {
       // Split by directory separator and rebuild path
       const pathParts = path.split('/').filter(p => p.trim() !== '');
       
@@ -255,7 +255,7 @@ const ocsrService = {
       if (pathParts.length >= 2) {
         const directory = pathParts[0];
         const filename = pathParts[pathParts.length - 1];
-        path = `${directory}/all_segments/${filename}`;
+        path = `${directory}/images/${filename}`;
       }
     }
     

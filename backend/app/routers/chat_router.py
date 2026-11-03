@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import logging
 import os
-
+import re
 from fastapi import APIRouter, HTTPException, status
 
 from app.config import (
-    PDF_DIR,
+    SEGMENTS_DIR,
     QWENPAW_AGENT_ID,
     QWENPAW_BASE_URL,
     QWENPAW_PASSWORD,
@@ -61,15 +61,23 @@ def _resolve_document_dir(pdf_filename: str | None) -> str:
     """
     if pdf_filename:
         # Strip any path components to prevent path traversal
-        safe_name = os.path.basename(pdf_filename).replace(" ", "_")
-        candidate = os.path.join(PDF_DIR, safe_name)
-        if os.path.isfile(candidate):
-            return os.path.dirname(os.path.abspath(candidate))
+        original_filename = pdf_filename
+
+        # Directory layout (shared with the decimer segmentation flow):
+        #   uploads/segments/{pdf_stem}/{pdf_stem}.md
+        #   uploads/segments/{pdf_stem}/images/picture_N_segmented.png
+        # Use the same directory naming as the segmentation router
+        seg_safe_name = re.sub(r"[^\w.-]", "_", original_filename)
+        pdf_stem = os.path.splitext(seg_safe_name)[0]
+        segments_dir = os.path.join(SEGMENTS_DIR, pdf_stem)
+
+        if os.path.isdir(segments_dir):
+            return segments_dir
         logger.warning(
             "Chat requested for unknown document '%s', falling back to PDF_DIR",
-            safe_name,
+            segments_dir,
         )
-    return os.path.abspath(PDF_DIR)
+    return None
 
 
 @router.post(

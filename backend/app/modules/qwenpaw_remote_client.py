@@ -35,7 +35,6 @@ class QwenPawRemoteClient:
             username: 用户名（如果需要认证）
             password: 密码（如果需要认证）
             file_extensions: 要处理的文件扩展名列表（如 ['.md', '.txt', '.png']），None 表示处理所有文件
-            only_path: 是否只发送文件路径给agent的skill（如果skill支持文件路径作为输入）
         """
         self.base_url = base_url or "http://localhost:8088"
         self.api_url = f"{self.base_url}/api/console/chat"
@@ -166,7 +165,7 @@ class QwenPawRemoteClient:
     def prompt(
             self,
             content: List[Dict],
-            save_to_path: str | None = None,
+            workspace: str | None = None,
             session_id: str = None
     ) -> Dict:
         """
@@ -174,7 +173,7 @@ class QwenPawRemoteClient:
 
         Args:
             content: 文件内容
-            save_to_path: 保存路径
+            workspace: 工作路径
         Returns:
             Dict: 包含生成结果
         """
@@ -195,10 +194,10 @@ class QwenPawRemoteClient:
                 }
             ],
             "session_id": session_id,
-            "user_id": self.username or "deeptutor",
+            "user_id": self.username or "molecode",
             "channel": "console",
             "request_context": {
-                "session_project_dir": save_to_path
+                "session_project_dir": workspace
             }
         }
 
@@ -268,10 +267,10 @@ class QwenPawRemoteClient:
 
         Args:
             prompt: 用户提示词
-            directory: 输入目录
+            directory: 输入目录，等同于workspace
             output_dir: 输出目录
             recursive: 是否递归扫描子目录
-            only_path: 只发送路径
+            only_path: 是否只发送文件路径给agent的skill（如果skill支持文件路径作为输入），否则发送文件内容到agent
 
         Returns:
             Dict: 处理结果统计
@@ -348,7 +347,7 @@ class QwenPawRemoteClient:
             # 生成输出
             result = self.prompt(
                 content=prompt,
-                save_to_path=str(absrel.parent),
+                workspace=str(absrel.parent),
                 session_id=session_id
             )
             if result["success"]:

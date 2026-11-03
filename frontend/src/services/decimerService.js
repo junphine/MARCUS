@@ -54,7 +54,7 @@ const decimerService = {
     }
     
     try {
-      const response = await api.post('/decimer/extract_doi', formData, config)
+      const response = await api.post('/depiction/extract_doi', formData, config)
       return response.data
     } catch (error) {
       console.error('Error extracting DOI from PDF:', error)
@@ -86,7 +86,7 @@ const decimerService = {
 listSegmentFiles: async (directory) => {
   try {
     // Request the specific files from the directory
-    const response = await api.get(`/decimer/list_directory/${directory}/all_segments`);
+    const response = await api.get(`/decimer/list_directory/${directory}/images`);
     
     if (!response.data.files || !Array.isArray(response.data.files)) {
       throw new Error("Invalid response format: files array missing");
@@ -121,7 +121,7 @@ listSegmentFiles: async (directory) => {
       return {
         id: uniqueId, // Use unique ID that includes page number
         // Don't set imageUrl here - let the imageUrl helper handle this consistently
-        path: `${directory}/all_segments/${filename}`,
+        path: `${directory}/images/${filename}`,
         filename: filename,
         pageNumber: pageNum + 1, // 1-based page number for display
         segmentNumber: segmentIndex,

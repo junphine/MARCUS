@@ -1053,8 +1053,8 @@ export default {
       this.hasIdenticalResults = false;
 
       // Determine image path format
-      const segmentsDirectory = this.segment.path ? this.segment.path.split('/all_segments/')[0] : '';
-      const imagePath = segmentsDirectory ? `${segmentsDirectory}/all_segments/${this.segment.filename}` : this.segment.filename;
+      const segmentsDirectory = this.segment.path ? this.segment.path.split('/images/')[0] : '';
+      const imagePath = segmentsDirectory ? `${segmentsDirectory}/images/${this.segment.filename}` : this.segment.filename;
 
       console.log('Segment path for comparison:', imagePath);
 
@@ -1173,7 +1173,7 @@ export default {
       try {
         if (this.segment.path) {
           // Pass just the segment path to getApiImageUrl - it will construct the right URL
-          // The helper will detect the "all_segments" path pattern and add the necessary prefix
+          // The helper will detect the "images" path pattern and add the necessary prefix
           this.segmentUrl = getApiImageUrl(this.segment.path);
           console.log('Created segment URL from path:', this.segmentUrl);
         } else {

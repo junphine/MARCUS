@@ -52,6 +52,10 @@
       <!-- Column 2: PDF Visualization -->
       <div class="column pdf-column" :style="{ width: columnWidths[1] + 'px' }">
         <div class="panel">
+            <h2 class="panel-title">
+                <vue-feather type="eye" class="icon"></vue-feather>
+                Pdf Viewer
+            </h2>
             <div class="pdf-viewer-container" v-if="pdfUrl">
               <PdfViewerObject :pdfUrl="pdfUrl" :pdfFile="pdfFile" />
             </div>

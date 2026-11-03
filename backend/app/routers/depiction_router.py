@@ -1,13 +1,18 @@
 from __future__ import annotations
-
+import os,re
+import uuid
 from typing import Optional, Literal, List
-from fastapi import APIRouter, Body, Form, HTTPException, Response, status
+from fastapi import APIRouter, Body, Form, HTTPException, File, status,UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
+from app.config import PDF_DIR, SEGMENTS_DIR
 from app.modules.cdk_wrapper import get_CDK_IAtomContainer, get_CDK_SDG_mol
 from app.schemas.healthcheck import HealthCheck
 from app.schemas.error import BadRequestModel, ErrorResponse, NotFoundModel
 from app.modules.depiction import generate_depiction
+from app.modules.pdf_wrapper import (
+    get_doi_from_file,
+)
 
 # Create the router
 router = APIRouter(
@@ -99,6 +104,74 @@ def get_health() -> HealthCheck:
     """
     return HealthCheck(status="OK")
 
+
+@router.post(
+    "/extract_doi",
+    summary="Extract DOI from PDF",
+    response_description="Return DOI extracted from PDF",
+    status_code=status.HTTP_200_OK,
+)
+async def extract_doi(
+        pdf_file: UploadFile = File(...),
+):
+    """
+    Extract DOI (Digital Object Identifier) from an uploaded PDF file.
+
+    Processes the uploaded PDF to extract its DOI using the pdf2doi library.
+    Falls back to using the filename if no DOI is found in the document.
+
+    Args:
+        pdf_file (UploadFile): The PDF file to process for DOI extraction.
+
+    Returns:
+        dict: JSON response containing the extracted DOI or fallback filename.
+
+    Raises:
+        HTTPException:
+            - 400: If uploaded file is not a PDF
+            - 500: If DOI extraction fails
+
+    Example:
+        >>> result = await extract_doi(pdf_file)
+        >>> print(result['doi'])
+        "10.1021/acs.jcim.2c00934"
+    """
+    if not pdf_file.filename.lower().endswith(".pdf"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded file must be a PDF",
+        )
+
+    try:
+        # Generate unique filename to prevent collisions
+        unique_id = str(uuid.uuid4())[:8]
+        original_filename = pdf_file.filename
+        # Replace spaces and special characters with underscores
+        safe_filename = re.sub(r"[^\w.-]", "_", original_filename)
+        filename_parts = os.path.splitext(original_filename)
+
+
+        # Create the full file path
+        file_path = os.path.join(PDF_DIR, safe_filename)
+
+        # Save the uploaded file
+        with open(file_path, "wb") as buffer:
+            content = await pdf_file.read()
+            buffer.write(content)
+
+        # Process the PDF file to extract DOI
+        doi_result = get_doi_from_file(file_path)
+
+        # Keep the file for future reference
+        # (you can implement a cleanup strategy if needed)
+
+        return doi_result
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error processing PDF: {str(e)}",
+        )
 
 # Depiction endpoint (JSON body)
 @router.post(

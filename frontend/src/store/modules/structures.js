@@ -235,10 +235,10 @@ export default {
             pdfId: state.currentPdfId, // Store PDF ID with segment info
           });
 
-          // Set the segments directory - remove 'all_segments' if needed
+          // Set the segments directory - remove 'images' if needed
           let directory = response.segments_directory;
-          if (directory && directory.includes("/all_segments")) {
-            directory = directory.split("/all_segments")[0];
+          if (directory && directory.includes("/images")) {
+            directory = directory.split("/images")[0];
           }
 
           commit("SET_SEGMENTS_DIRECTORY", directory);

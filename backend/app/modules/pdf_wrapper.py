@@ -1,21 +1,35 @@
 import os
 import re
-
+import json
+from pathlib import Path
 from fastapi import HTTPException, status, File, Form, UploadFile
-from docling.datamodel.base_models import InputFormat
-from docling.datamodel.pipeline_options import PdfPipelineOptions
-from docling.document_converter import (
-    DocumentConverter,
-    PdfFormatOption,
-    ConversionResult,
-)
 from PyPDF2 import PdfReader, PdfWriter
-from app.config import PDF_DIR,MODELS_DIR
+from typing import List, Optional, Tuple, Dict, Any
+from app.config import PDF_DIR, SEGMENTS_DIR, MODELS_DIR
+from functools import lru_cache
 
-pipeline_options = PdfPipelineOptions(artifacts_path=MODELS_DIR)
-doc_converter = DocumentConverter(
-    format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)}
-)
+
+@lru_cache(maxsize=128)
+def get_doi_from_file(filepath: str) -> Dict[str, str]:
+    """
+    Extract the DOI from a PDF file with caching.
+
+    Uses LRU cache to avoid repeated DOI extraction for the same files.
+    """
+    from pdf2doi import pdf2doi
+
+    try:
+        doi_dict = pdf2doi(filepath)
+        doi = doi_dict["identifier"]
+        if not doi:
+            doi = Path(filepath).stem
+        return {"doi": doi}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error extracting DOI: {str(e)}",
+        )
+
 
 
 def _is_author_line(content: str) -> bool:
@@ -262,7 +276,7 @@ def _is_unwanted_content(content: str) -> bool:
     return False
 
 
-def extract_first_three_pages(input_pdf_path, number_of_pages=2):
+def extract_first_pages(input_pdf_path, number_of_pages=5):
     """
     Extract a specified number of pages from the beginning of a PDF file.
 
@@ -282,7 +296,7 @@ def extract_first_three_pages(input_pdf_path, number_of_pages=2):
         Exception: If PDF reading/writing operations fail.
 
     Example:
-        >>> output_path = extract_first_three_pages("document.pdf", 2)
+        >>> output_path = extract_first_pages("document.pdf", 2)
         >>> print(output_path)
         "document_out.pdf"
     """
@@ -310,33 +324,6 @@ def extract_first_three_pages(input_pdf_path, number_of_pages=2):
         return output_pdf_file_path
 
 
-def get_converted_document(path, number_of_pages=2):
-    """
-    Convert a PDF document to structured JSON format using Docling.
-
-    Extracts the first N pages from a PDF and converts them to a structured
-    document format that can be processed for content extraction.
-
-    Args:
-        path (str): Path to the PDF file to be converted.
-        number_of_pages (int, optional): Number of pages to process. Defaults to 2.
-
-    Returns:
-        dict: Document structure in JSON format containing text elements,
-              layout information, and metadata from the converted PDF.
-
-    Raises:
-        Exception: If document conversion fails or file cannot be processed.
-
-    Example:
-        >>> doc_dict = get_converted_document("paper.pdf", 2)
-        >>> print(doc_dict.keys())
-        dict_keys(['texts', 'schema_name', 'name', ...])
-    """
-    output_pdf_file_path = extract_first_three_pages(path, number_of_pages)
-    conv_result: ConversionResult = doc_converter.convert(output_pdf_file_path)
-    conv_result_dict = conv_result.document.export_to_dict()
-    return conv_result_dict
 
 
 def extract_paper_main_content(doc_json):
@@ -615,8 +602,7 @@ def text_formatting_clean(combined_paragraph):
 
 
 async def extract_pdf_text_with_headers(
-    pdf_file: UploadFile = File(...),
-    pages: int = Form(2, description="Number of pages to process"),
+    pdf_file: UploadFile = File(...)
 ):
     """
     Extract and process text content from an uploaded PDF file.
@@ -626,8 +612,6 @@ async def extract_pdf_text_with_headers(
 
     Args:
         pdf_file (UploadFile): The PDF file to process (required).
-        pages (int): Number of pages to process from the beginning. Defaults to 2.
-
     Returns:
         dict: JSON object containing:
               - text: Combined extracted text content
@@ -650,6 +634,17 @@ async def extract_pdf_text_with_headers(
         original_filename = pdf_file.filename
         safe_filename = original_filename.replace(" ", "_")
 
+
+
+        # Directory layout (shared with the decimer segmentation flow):
+        #   uploads/segments/{pdf_stem}/{pdf_stem}.md
+        #   uploads/segments/{pdf_stem}/images/picture_N_segmented.png
+        # Use the same directory naming as the segmentation router
+        seg_safe_name = re.sub(r"[^\w.-]", "_", original_filename)
+        pdf_stem = os.path.splitext(seg_safe_name)[0]
+        segments_dir = os.path.join(SEGMENTS_DIR, pdf_stem)
+        json_path = os.path.join(segments_dir, f"{pdf_stem}.json")
+
         # Create the full file path
         file_path = os.path.join(PDF_DIR, safe_filename)
 
@@ -662,9 +657,14 @@ async def extract_pdf_text_with_headers(
             with open(file_path, "wb") as buffer:
                 content = await pdf_file.read()
                 buffer.write(content)
+        if not os.path.exists(json_path):
+            from .docling_segmentation_wrapper import get_segments_with_bbox_docling
+            get_segments_with_bbox_docling(file_path,None)
 
         # Process the PDF file
-        json_data = get_converted_document(file_path, number_of_pages=pages)
+        with open(json_path, "r", encoding="utf-8") as json_fd:
+            json_data = json.load(json_fd)
+
         result = extract_from_docling_document(json_data)
         # title + main text
         combined_text = combine_to_paragraph(result)
@@ -765,7 +765,9 @@ async def extract_pdf_markdown(
     Extract Markdown content from an uploaded PDF file using Docling.
 
     Handles PDF upload, converts the document with Docling,
-    and exports the document as Markdown text.
+    and exports the document as Markdown text. The full-document result
+    is cached on disk (uploads/segments/{pdf_stem}/{pdf_stem}.md) and
+    returned directly on subsequent requests.
 
     Args:
         pdf_file (UploadFile): The PDF file to process (required).
@@ -793,6 +795,29 @@ async def extract_pdf_markdown(
         original_filename = pdf_file.filename
         safe_filename = original_filename.replace(" ", "_")
 
+        # Directory layout (shared with the decimer segmentation flow):
+        #   uploads/segments/{pdf_stem}/{pdf_stem}.md
+        #   uploads/segments/{pdf_stem}/images/picture_N_segmented.png
+        # Use the same directory naming as the segmentation router
+        seg_safe_name = re.sub(r"[^\w.-]", "_", original_filename)
+        pdf_stem = os.path.splitext(seg_safe_name)[0]
+        segments_dir = os.path.join(SEGMENTS_DIR, pdf_stem)
+        all_segments_dir = os.path.join(segments_dir, "images")
+        md_path = os.path.join(segments_dir, f"{pdf_stem}.md")
+
+        # Only full-document extraction is cached; an explicit page limit
+        # always regenerates (and never overwrites the cached full document)
+        full_document = not (pages and pages > 0)
+
+        # Return the previously generated markdown directly if it exists
+        if full_document and os.path.isfile(md_path):
+            with open(md_path, "r", encoding="utf-8") as md_file:
+                cached_markdown = md_file.read()
+                # The references section is not needed for downstream usage
+                cached_markdown = _strip_references_section(cached_markdown)
+
+            return {"text": cached_markdown, "pdf_filename": safe_filename}
+
         # Create the full file path
         file_path = os.path.join(PDF_DIR, safe_filename)
 
@@ -808,15 +833,15 @@ async def extract_pdf_markdown(
 
         # Process the PDF file with Docling and export as Markdown
         # Only truncate to the first N pages when explicitly requested (pages > 0)
-        if pages and pages > 0:
-            path_to_convert = extract_first_three_pages(file_path, pages)
-        else:
+        if full_document:
             path_to_convert = file_path
+        else:
+            path_to_convert = extract_first_pages(file_path, pages)
 
-        conv_result: ConversionResult = doc_converter.convert(path_to_convert)
-        markdown_text = conv_result.document.export_to_markdown()
+        from .docling_segmentation_wrapper import get_segments_with_bbox_docling
 
-        # The references section is not needed for downstream usage
+        _,_,markdown_text = get_segments_with_bbox_docling(path_to_convert,None)
+
         markdown_text = _strip_references_section(markdown_text)
 
         return {"text": markdown_text, "pdf_filename": safe_filename}

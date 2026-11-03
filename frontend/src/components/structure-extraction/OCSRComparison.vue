@@ -335,9 +335,9 @@ export default {
       
       try {
         // Determine image path format
-        const segmentsDirectory = this.segment.path?.split('/all_segments/')[0];
+        const segmentsDirectory = this.segment.path?.split('/images/')[0];
         const imagePath = segmentsDirectory ? 
-          `${segmentsDirectory}/all_segments/${this.segment.filename}` : 
+          `${segmentsDirectory}/images/${this.segment.filename}` :
           this.segment.filename;
         
         console.log(`Processing segment with ${engine} engine: ${imagePath}`);

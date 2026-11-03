@@ -13,10 +13,6 @@
     <div v-else class="pdf-container">
       <div class="pdf-controls">
         <div class="page-info">
-          <div class="document-title">
-            <vue-feather type="file-text" size="16" class="document-icon"></vue-feather>
-            <span>PDF Document</span>
-          </div>
           <div v-if="doi" class="doi-section">
             <div class="doi-info">
               <span class="doi-label">DOI:</span>

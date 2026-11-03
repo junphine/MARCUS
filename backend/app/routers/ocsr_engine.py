@@ -82,14 +82,14 @@ def find_image_path(image_path: str) -> str:
         return images_path
 
     # Handle segments with respect to PDF hierarchy
-    if SEGMENTS_DIR and "/all_segments/" in image_path:
+    if SEGMENTS_DIR and "/images/" in image_path:
         # Extract the PDF directory name from the path
         path_parts = image_path.split("/")
 
         # Find the PDF directory part in the path
         pdf_dir_index = -1
         for i, part in enumerate(path_parts):
-            if part == "all_segments" and i > 0:
+            if part == "images" and i > 0:
                 pdf_dir_index = i - 1
                 break
 
@@ -104,8 +104,8 @@ def find_image_path(image_path: str) -> str:
             if os.path.exists(image_path) and os.path.isfile(image_path):
                 return image_path
 
-            # Then check in the PDF's all_segments directory
-            pdf_segments_dir = os.path.join(SEGMENTS_DIR, pdf_directory, "all_segments")
+            # Then check in the PDF's images directory
+            pdf_segments_dir = os.path.join(SEGMENTS_DIR, pdf_directory, "images")
             pdf_segment_path = os.path.join(pdf_segments_dir, segment_name)
 
             if os.path.exists(pdf_segment_path) and os.path.isfile(pdf_segment_path):

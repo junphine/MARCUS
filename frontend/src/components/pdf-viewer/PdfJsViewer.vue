@@ -353,7 +353,7 @@ export default {
     display: flex;
     align-items: center;
     gap: 1.2rem;
-    padding: 0.75rem 1.5rem;
+    padding: 0.5rem 0.5rem;
     background: var(--color-card-bg, #f8fafc);
     border-bottom: 1px solid var(--color-border, #e0e0e0);
     box-shadow: 0 2px 8px rgba(80, 120, 200, 0.04);

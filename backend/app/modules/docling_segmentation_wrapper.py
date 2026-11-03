@@ -1,11 +1,12 @@
 import os
-import uuid
+import re
 import json
 import threading
 import hashlib
 from typing import List, Optional, Tuple, Dict, Any
 from pathlib import Path
 import cv2
+import glob
 import numpy as np
 from docling.document_converter import DocumentConverter, PdfFormatOption
 from docling.datamodel.pipeline_options import PdfPipelineOptions
@@ -16,7 +17,6 @@ from fastapi import HTTPException, status
 from functools import lru_cache
 import time
 from contextlib import contextmanager
-import multiprocessing as mp
 
 from app.config import PDF_DIR, SEGMENTS_DIR, MODELS_DIR
 
@@ -31,7 +31,9 @@ pdf_metadata_cache = {}
 # Configure Docling to generate picture images
 pipeline_options = PdfPipelineOptions(artifacts_path=MODELS_DIR)
 pipeline_options.generate_picture_images = True
-pipeline_options.generate_table_images = True
+pipeline_options.do_formula_enrichment = True
+pipeline_options.images_scale = 2.0
+#pipeline_options.do_chart_extraction = True
 
 doc_converter = DocumentConverter(
     format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)}
@@ -61,28 +63,6 @@ def thread_safe_dict_access(lock):
         yield
     finally:
         lock.release()
-
-
-@lru_cache(maxsize=128)
-def get_doi_from_file(filepath: str) -> Dict[str, str]:
-    """
-    Extract the DOI from a PDF file with caching.
-
-    Uses LRU cache to avoid repeated DOI extraction for the same files.
-    """
-    from pdf2doi import pdf2doi
-
-    try:
-        doi_dict = pdf2doi(filepath)
-        doi = doi_dict["identifier"]
-        if not doi:
-            doi = Path(filepath).stem
-        return {"doi": doi}
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error extracting DOI: {str(e)}",
-        )
 
 
 def get_pdf_hash(filepath: str) -> str:
@@ -137,17 +117,52 @@ def extract_picture_segments_from_pdf(
         Tuple of (output_directory, segments_metadata)
     """
     base_directory = create_output_directory(file_path)
-    all_segments_dir = os.path.join(base_directory, "all_segments")
+    all_segments_dir = os.path.join(base_directory, "images")
     os.makedirs(all_segments_dir, exist_ok=True)
 
     segments_metadata = []
 
     try:
+        # Use original filename without adding unique IDs
+        original_filename = Path(file_path).name
 
+        # Directory layout (shared with the decimer segmentation flow):
+        #   uploads/segments/{pdf_stem}/{pdf_stem}.md
+        #   uploads/segments/{pdf_stem}/images/picture_N_segmented.png
+        # Use the same directory naming as the segmentation router
+        seg_safe_name = re.sub(r"[^\w.-]", "_", original_filename)
+        pdf_stem = os.path.splitext(seg_safe_name)[0]
+        md_path = os.path.join(base_directory, f"{pdf_stem}.md")
+        json_path = os.path.join(base_directory, f"{pdf_stem}.json")
 
         # Convert the document
         conv_result: ConversionResult = doc_converter.convert(file_path)
         doc = conv_result.document
+
+        markdown_text = doc.export_to_markdown()
+        # Replace docling's image placeholders with relative image links so the
+        # markdown file resolves images relative to its own location
+        image_index = 0
+
+        def _image_replacer(_match):
+            nonlocal image_index
+            image_index += 1
+            return (
+                f"![Figure {image_index}]"
+                f"(images/picture_{image_index}_segmented.png)"
+            )
+
+        markdown_text = re.sub(r"<!--\s*image\s*-->", _image_replacer, markdown_text)
+
+        # Save the markdown file next to the images (full document only,
+        # so the cache always holds the complete document)
+        if md_path:
+            with open(md_path, "w", encoding="utf-8") as md_file:
+                md_file.write(markdown_text)
+        if json_path:
+            json_result = doc.export_to_dict()
+            with open(json_path, "w", encoding="utf-8") as json_file:
+                json.dump(json_result,json_file,ensure_ascii=False,indent=2)
 
         # Process each element in the document to find pictures
         picture_counter = 0
@@ -195,7 +210,7 @@ def extract_picture_segments_from_pdf(
                     segment_metadata = {
                         "segment_id": segment_id,
                         "filename": segment_filename,
-                        "path": os.path.join("all_segments", segment_filename),
+                        "path": os.path.join("images", segment_filename),
                         "full_path": segment_path,
                         "pageNumber": page_number,
                         "bbox": bbox,  # [x0, y0, x1, y1]
@@ -218,7 +233,7 @@ def extract_picture_segments_from_pdf(
         # Fall back to empty results rather than failing completely
         pass
 
-    return base_directory, segments_metadata
+    return base_directory, segments_metadata, markdown_text
 
 
 @measure_performance
@@ -265,7 +280,7 @@ def get_complete_segments(path_to_pdf: str, collect_all: bool = True) -> Dict[st
 
             # Generate basic metadata if still not found
             if not segments_metadata:
-                all_segments_dir = os.path.join(segment_directory, "all_segments")
+                all_segments_dir = os.path.join(segment_directory, "images")
                 if os.path.exists(all_segments_dir):
                     segments_metadata = generate_basic_metadata(
                         all_segments_dir, pdf_filename
@@ -285,7 +300,7 @@ def get_complete_segments(path_to_pdf: str, collect_all: bool = True) -> Dict[st
                 stored_segment_info[pdf_filename] = segments_metadata
 
         # Prepare result
-        all_segments_dir = os.path.join(segment_directory, "all_segments")
+        all_segments_dir = os.path.join(segment_directory, "images")
         result = {
             "segment_directory": segment_directory,
             "segments_existed": segments_already_exist,
@@ -327,7 +342,7 @@ def generate_basic_metadata(
                     segment_metadata = {
                         "segment_id": segment_id,
                         "filename": segment_file,
-                        "path": os.path.join("all_segments", segment_file),
+                        "path": os.path.join("images", segment_file),
                         "full_path": os.path.join(all_segments_dir, segment_file),
                         "pageNumber": 0,  # Default - we don't have page info from filename alone
                         "segmentNumber": idx + 1,
@@ -404,7 +419,7 @@ def segments_exist(filepath: str) -> Tuple[bool, Optional[str]]:
     base_directory = max(matching_dirs, key=lambda d: d.stat().st_mtime)
 
     # Check for segments
-    all_segments_dir = base_directory / "all_segments"
+    all_segments_dir = base_directory / "images"
     if all_segments_dir.exists() and all_segments_dir.is_dir():
         # Quick check for any PNG files
         if any(all_segments_dir.glob("*_segmented.png")):
@@ -487,11 +502,10 @@ def cleanup_caches():
 
     # Clean up old cache files
     cache_pattern = os.path.join(SEGMENTS_DIR, "cache_highlighted_*.png")
-    import glob
 
     for cache_file in glob.glob(cache_pattern):
         try:
             if time.time() - os.path.getmtime(cache_file) > 3600:  # 1 hour old
                 os.remove(cache_file)
-        except:
+        except Exception as e:
             pass

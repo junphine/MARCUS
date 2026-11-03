@@ -16,7 +16,6 @@ from app.schemas.healthcheck import HealthCheck
 from app.schemas.error import BadRequestModel, ErrorResponse, NotFoundModel
 from app.config import PDF_DIR, SEGMENTS_DIR
 from app.modules.docling_segmentation_wrapper import (
-    get_doi_from_file,
     get_complete_segments,
     segments_exist,
     get_highlighted_segment_image,
@@ -62,74 +61,6 @@ def get_health() -> HealthCheck:
     """
     return HealthCheck(status="OK")
 
-
-@router.post(
-    "/extract_doi",
-    summary="Extract DOI from PDF",
-    response_description="Return DOI extracted from PDF",
-    status_code=status.HTTP_200_OK,
-)
-async def extract_doi(
-    pdf_file: UploadFile = File(...),
-):
-    """
-    Extract DOI (Digital Object Identifier) from an uploaded PDF file.
-
-    Processes the uploaded PDF to extract its DOI using the pdf2doi library.
-    Falls back to using the filename if no DOI is found in the document.
-
-    Args:
-        pdf_file (UploadFile): The PDF file to process for DOI extraction.
-
-    Returns:
-        dict: JSON response containing the extracted DOI or fallback filename.
-
-    Raises:
-        HTTPException:
-            - 400: If uploaded file is not a PDF
-            - 500: If DOI extraction fails
-
-    Example:
-        >>> result = await extract_doi(pdf_file)
-        >>> print(result['doi'])
-        "10.1021/acs.jcim.2c00934"
-    """
-    if not pdf_file.filename.lower().endswith(".pdf"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Uploaded file must be a PDF",
-        )
-
-    try:
-        # Generate unique filename to prevent collisions
-        unique_id = str(uuid.uuid4())[:8]
-        original_filename = pdf_file.filename
-        # Replace spaces and special characters with underscores
-        safe_filename = re.sub(r"[^\w.-]", "_", original_filename)
-        filename_parts = os.path.splitext(original_filename)
-
-
-        # Create the full file path
-        file_path = os.path.join(PDF_DIR, safe_filename)
-
-        # Save the uploaded file
-        with open(file_path, "wb") as buffer:
-            content = await pdf_file.read()
-            buffer.write(content)
-
-        # Process the PDF file to extract DOI
-        doi_result = get_doi_from_file(file_path)
-
-        # Keep the file for future reference
-        # (you can implement a cleanup strategy if needed)
-
-        return doi_result
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error processing PDF: {str(e)}",
-        )
 
 
 @router.post(
@@ -293,8 +224,8 @@ async def list_segments():
         for item in os.listdir(SEGMENTS_DIR):
             item_path = os.path.join(SEGMENTS_DIR, item)
             if os.path.isdir(item_path):
-                # Check if it has an all_segments directory
-                all_segments_dir = os.path.join(item_path, "all_segments")
+                # Check if it has an images directory
+                all_segments_dir = os.path.join(item_path, "images")
 
                 # Count segments
                 segments_count = 0
@@ -344,7 +275,7 @@ async def get_segment_image(
     Retrieve a specific chemical structure segment image file.
 
     Serves individual segment images from the organized directory structure,
-    handling both direct paths and all_segments subdirectory organization.
+    handling both direct paths and images subdirectory organization.
 
     Args:
         directory (str): The segment directory name (PDF-based directory).
@@ -372,14 +303,14 @@ async def get_segment_image(
                 detail="Invalid directory or image name",
             )
 
-        # Handle path with or without all_segments subdirectory
-        if "all_segments" in image_name:
-            # Path already includes all_segments
+        # Handle path with or without images subdirectory
+        if "images" in image_name:
+            # Path already includes images
             image_path = os.path.join(SEGMENTS_DIR, directory, image_name)
-        elif os.path.exists(os.path.join(SEGMENTS_DIR, directory, "all_segments")):
-            # Check if all_segments exists and use it
+        elif os.path.exists(os.path.join(SEGMENTS_DIR, directory, "images")):
+            # Check if images exists and use it
             image_path = os.path.join(
-                SEGMENTS_DIR, directory, "all_segments", image_name
+                SEGMENTS_DIR, directory, "images", image_name
             )
         else:
             # Fallback to direct path
@@ -411,7 +342,7 @@ def _count_segments(directory_path: str) -> int:
     Count the number of segmented images in a directory structure.
 
     Helper function that handles different directory organizations including
-    all_segments subdirectories and individual segment directories.
+    images subdirectories and individual segment directories.
 
     Args:
         directory_path (str): Path to the directory to count segments in.
@@ -429,16 +360,16 @@ def _count_segments(directory_path: str) -> int:
         return 0
 
     try:
-        # Check if directory_path is the "all_segments" directory itself
-        if os.path.basename(directory_path) == "all_segments" and os.path.exists(
+        # Check if directory_path is the "images" directory itself
+        if os.path.basename(directory_path) == "images" and os.path.exists(
             directory_path
         ):
             return len(
                 [f for f in os.listdir(directory_path) if f.endswith("_segmented.png")]
             )
 
-        # Check if there's an "all_segments" subdirectory
-        all_segments_dir = os.path.join(directory_path, "all_segments")
+        # Check if there's an "images" subdirectory
+        all_segments_dir = os.path.join(directory_path, "images")
         if os.path.exists(all_segments_dir) and os.path.isdir(all_segments_dir):
             return len(
                 [
@@ -448,7 +379,7 @@ def _count_segments(directory_path: str) -> int:
                 ]
             )
 
-        # If all_segments doesn't exist, try counting in individual segment directories
+        # If images doesn't exist, try counting in individual segment directories
         count = 0
         # Look for directories ending with _segments
         for item in os.listdir(directory_path):
@@ -495,7 +426,7 @@ async def list_directory(directory: str, subdirectory: str = None):
             - 500: Directory listing error
 
     Example:
-        >>> result = await list_directory("chemistry_paper", "all_segments")
+        >>> result = await list_directory("chemistry_paper", "images")
         >>> print(len(result['files']))
         8
     """

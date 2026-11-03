@@ -122,10 +122,10 @@ export default {
       return !!this.extractedText
     },
     /**
-     * Markdown with docling's <!-- image --> placeholders replaced by
-     * real segment image URIs, e.g.
+     * Markdown with relative image paths (images/...) rewritten to
+     * backend URLs for preview rendering, e.g.
      * http://localhost:9000/latest/decimer/get_segment_image/{pdf}/picture_1_segmented.png
-     * The numbering matches the backend segmentation order (picture_1, picture_2, ...).
+     * The raw markdown (and the downloaded file) keeps the relative paths.
      */
     markdownWithImages() {
       if (!this.extractedText) return ''
@@ -137,14 +137,11 @@ export default {
         .replace(/[^\w.-]/g, '_')
         .replace(/\.pdf$/i, '')
 
-      let figureIndex = 0
-      return this.extractedText.replace(/<!--\s*image\s*-->/g, () => {
-        figureIndex += 1
-        const imageUrl = getApiImageUrl(
-          `${pdfStem}/all_segments/picture_${figureIndex}_segmented.png`
-        )
-        return `![Figure ${figureIndex}](${imageUrl})`
-      })
+      return this.extractedText.replace(
+        /!\[([^\]]*)\]\((images\/[^)\s]+)\)/g,
+        (match, alt, relPath) =>
+          `![${alt}](${getApiImageUrl(`${pdfStem}/${relPath}`)})`
+      )
     },
     renderedMarkdown() {
       if (!this.markdownWithImages) return ''
@@ -156,9 +153,11 @@ export default {
       this.$emit('extract-annotations')
     },
     downloadText() {
-      if (!this.markdownWithImages) return
+      if (!this.extractedText) return
 
-      const blob = new Blob([this.markdownWithImages], { type: 'text/markdown' })
+      // Download the markdown with relative image paths (same as the
+      // markdown file stored on the server next to images/)
+      const blob = new Blob([this.extractedText], { type: 'text/markdown' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url

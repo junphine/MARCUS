@@ -2,7 +2,8 @@ from __future__ import annotations
 import os,re
 import uuid
 import logging
-from PyPDF2 import PdfReader
+import json
+
 from fastapi import (
     APIRouter,
     HTTPException,
@@ -13,13 +14,14 @@ from fastapi import (
 )
 from app.schemas.healthcheck import HealthCheck
 from app.schemas.error import BadRequestModel, ErrorResponse, NotFoundModel
-from app.config import PDF_DIR
-from app.modules.dockling_wrapper import (
-    get_converted_document,
+from app.config import PDF_DIR,SEGMENTS_DIR
+from app.modules.pdf_wrapper import (
+    extract_pdf_text_with_headers,
     extract_pdf_markdown,
-    combine_to_paragraph,
+    get_doi_from_file,
 )
 from app.security.file_validator import validate_pdf_upload
+
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +61,7 @@ def get_health() -> HealthCheck:
     return HealthCheck(status="OK")
 
 
+
 @router.post(
     "/extract_json",
     summary="Extract JSON data from PDF",
@@ -67,14 +70,12 @@ def get_health() -> HealthCheck:
 )
 async def extract_pdf_json(
     pdf_file: UploadFile = File(...),
-    pages: int = Form(2, description="Number of pages to process"),
 ):
     """
     Upload a PDF file and extract its content as a structured JSON document.
 
     Args:
         pdf_file: The PDF file to process
-        pages: Number of pages to process (default: 2)
 
     Returns:
         JSON: The extracted document structure
@@ -105,6 +106,11 @@ async def extract_pdf_json(
         filename_parts = os.path.splitext(safe_filename)
         safe_filename = f"{filename_parts[0]}_{unique_id}{filename_parts[1]}"
 
+        seg_safe_name = re.sub(r"[^\w.-]", "_", original_filename)
+        pdf_stem = os.path.splitext(seg_safe_name)[0]
+        segments_dir = os.path.join(SEGMENTS_DIR, pdf_stem)
+        json_path = os.path.join(segments_dir, f"{pdf_stem}.json")
+
         # Create the full file path
         file_path = os.path.join(PDF_DIR, safe_filename)
 
@@ -116,11 +122,16 @@ async def extract_pdf_json(
         logger.info(f"File saved successfully: {safe_filename}")
 
         # Process the PDF file
-        json_data = get_converted_document(file_path, number_of_pages=pages)
+        if not os.path.exists(json_path):
+            from app.modules.docling_segmentation_wrapper import get_segments_with_bbox_docling
+            get_segments_with_bbox_docling(file_path,None)
+
+        # Process the PDF file
+        with open(json_path, "r", encoding="utf-8") as json_fd:
+            json_data = json.load(json_fd)
 
         # Keep the file for future reference
         # (you can implement a cleanup strategy if needed)
-
         return json_data
 
     except Exception as e:

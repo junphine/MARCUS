@@ -47,7 +47,7 @@ export const getApiImageUrl = (path) => {
   }
   
   // Handle segment image paths to ensure proper versioning and format
-  if (path.includes('all_segments')) {
+  if (path.includes('images')) {
     // Extract relevant parts from the path
     let cleanPath = path;
     
@@ -64,7 +64,7 @@ export const getApiImageUrl = (path) => {
     }
     
     // The backend expects a specific format for segment images:
-    // Instead of /Untitled-1/all_segments/page_0_0_segmented.png
+    // Instead of /Untitled-1/images/page_0_0_segmented.png
     // It needs /Untitled-1/page_0_0_segmented.png
     
     const pathParts = cleanPath.split('/');
