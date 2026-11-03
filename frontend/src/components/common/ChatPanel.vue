@@ -37,7 +37,12 @@
           :class="message.role"
         >
           <div class="message-bubble">
-            <div class="message-text">{{ message.text }}</div>
+            <div
+              v-if="message.role === 'assistant'"
+              class="message-text markdown-body"
+              v-html="renderMarkdown(message.text)"
+            ></div>
+            <div v-else class="message-text">{{ message.text }}</div>
           </div>
         </div>
 
@@ -70,11 +75,24 @@
           <vue-feather type="send" size="16"></vue-feather>
         </button>
       </div>
+
+      <!-- Send options -->
+      <div class="chat-options">
+        <label class="chat-option" title="When enabled, only the document path is sent to the agent">
+          <input
+            v-model="onlySendPath"
+            type="checkbox"
+            class="chat-option-checkbox"
+          />
+          <span class="chat-option-label">Only send path</span>
+        </label>
+      </div>
     </div>
   </transition>
 </template>
 
 <script>
+import { marked } from 'marked'
 import chatService from '@/services/chatService'
 
 export default {
@@ -95,7 +113,10 @@ export default {
       inputText: '',
       isLoading: false,
       // Chat session ID keeps multi-turn conversation context in QwenPaw
-      chatSessionId: this.generateSessionId()
+      chatSessionId: this.generateSessionId(),
+      // When enabled (default), only send the document path to the agent;
+      // when disabled, send the document's markdown content via ask_markdown
+      onlySendPath: true
     }
   },
 
@@ -123,6 +144,11 @@ export default {
       return `chat-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`
     },
 
+    renderMarkdown(text) {
+      if (!text) return ''
+      return marked.parse(text, { breaks: true })
+    },
+
     async sendMessage() {
       const question = this.inputText.trim()
       if (!question || this.isLoading) return
@@ -136,7 +162,8 @@ export default {
         const result = await chatService.ask(
           question,
           this.currentPdfName,
-          this.chatSessionId
+          this.chatSessionId,
+          this.onlySendPath
         )
         this.messages.push({
           role: 'assistant',
@@ -173,8 +200,8 @@ export default {
   position: fixed;
   top: 70px;
   right: 20px;
-  width: 380px;
-  max-width: calc(100vw - 40px);
+  width: 480px;
+  max-width: calc(100vw - 80px);
   height: min(560px, calc(100vh - 100px));
   display: flex;
   flex-direction: column;
@@ -294,7 +321,7 @@ export default {
 }
 
 .message-bubble {
-  max-width: 85%;
+  max-width: 95%;
   padding: 0.6rem 0.85rem;
   border-radius: 12px;
   font-size: 0.875rem;
@@ -317,6 +344,108 @@ export default {
 
 .message-text {
   white-space: pre-wrap;
+}
+
+/* Markdown rendering for assistant messages */
+.markdown-body {
+  white-space: normal;
+  line-height: 1.55;
+  font-size: 0.875rem;
+  word-break: break-word;
+
+  ::v-deep(p) {
+    margin: 0 0 0.5rem;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+
+  ::v-deep(h1),
+  ::v-deep(h2),
+  ::v-deep(h3),
+  ::v-deep(h4),
+  ::v-deep(h5),
+  ::v-deep(h6) {
+    margin: 0.75rem 0 0.5rem;
+    line-height: 1.3;
+    font-weight: 600;
+
+    &:first-child {
+      margin-top: 0;
+    }
+  }
+
+  ::v-deep(ul),
+  ::v-deep(ol) {
+    margin: 0 0 0.5rem;
+    padding-left: 1.25rem;
+  }
+
+  ::v-deep(li) {
+    margin-bottom: 0.15rem;
+  }
+
+  ::v-deep(blockquote) {
+    margin: 0 0 0.5rem;
+    padding-left: 0.75rem;
+    border-left: 3px solid var(--color-border);
+    color: var(--color-text-secondary);
+  }
+
+  ::v-deep(code) {
+    background-color: rgba(0, 0, 0, 0.06);
+    border-radius: 4px;
+    padding: 0.1rem 0.3rem;
+    font-size: 0.82em;
+    font-family: var(--font-mono, monospace);
+  }
+
+  ::v-deep(pre) {
+    background-color: rgba(0, 0, 0, 0.06);
+    border-radius: 8px;
+    padding: 0.75rem;
+    overflow-x: auto;
+    margin: 0 0 0.5rem;
+
+    code {
+      background: none;
+      padding: 0;
+    }
+  }
+
+  ::v-deep(table) {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 0 0 0.5rem;
+
+    th,
+    td {
+      border: 1px solid var(--color-border);
+      padding: 0.35rem 0.5rem;
+      text-align: left;
+    }
+
+    th {
+      background-color: rgba(0, 0, 0, 0.04);
+    }
+  }
+
+  ::v-deep(img) {
+    max-width: 100%;
+    height: auto;
+    border-radius: 6px;
+  }
+
+  ::v-deep(a) {
+    color: var(--color-primary);
+  }
+
+  ::v-deep(hr) {
+    border: none;
+    border-top: 1px solid var(--color-border);
+    margin: 0.75rem 0;
+  }
 }
 
 /* Loading indicator */
@@ -403,6 +532,36 @@ export default {
 .chat-send:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Send options */
+.chat-options {
+  display: flex;
+  align-items: center;
+  padding: 0.35rem 0.75rem 0.75rem;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-panel-bg);
+}
+
+.chat-option {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.chat-option-checkbox {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  cursor: pointer;
+  accent-color: var(--color-primary);
+}
+
+.chat-option-label {
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
 }
 
 /* Slide transition */

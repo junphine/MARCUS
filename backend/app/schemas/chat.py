@@ -15,11 +15,15 @@ class ChatRequest(BaseModel):
             working directory for the QwenPaw agent.
         session_id (Optional[str]): Chat session identifier used to keep
             multi-turn conversation context in QwenPaw.
+        only_path (bool): When True (default), send only the question and
+            let the agent resolve files from the workspace path. When False,
+            send the document's markdown content via ``ask_markdown``.
     """
 
     question: str = Field(..., min_length=1)
     pdf_filename: Optional[str] = None
     session_id: Optional[str] = None
+    only_path: bool = True
 
 
 class ChatResponse(BaseModel):

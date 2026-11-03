@@ -11,9 +11,11 @@ const chatService = {
    * @param {string} question - The user's question
    * @param {string|null} pdfFilename - Filename of the current PDF (as stored on the server)
    * @param {string|null} chatSessionId - Chat session ID for multi-turn conversation context
+   * @param {boolean} onlySendPath - When true (default), only send the path and let the
+   *   agent resolve files itself; when false, send the document's markdown content
    * @returns {Promise} - Promise with the answer data ({ answer, session_id, document_dir })
    */
-  ask: async (question, pdfFilename = null, chatSessionId = null) => {
+  ask: async (question, pdfFilename = null, chatSessionId = null, onlySendPath = true) => {
     const config = {
       headers: {},
       // The agent may need to read/process the whole document, allow long requests
@@ -30,7 +32,8 @@ const chatService = {
       const response = await api.post('/chat/ask', {
         question,
         pdf_filename: pdfFilename || null,
-        session_id: chatSessionId || null
+        session_id: chatSessionId || null,
+        only_path: onlySendPath
       }, config)
       return response.data
     } catch (error) {

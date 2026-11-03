@@ -1,5 +1,6 @@
 """Small authenticated HTTP/SSE client for QwenPaw Agent gateway."""
 import os
+import re
 import base64
 from pathlib import Path
 from typing import List, Dict, Tuple
@@ -8,10 +9,25 @@ import json
 import uuid
 from datetime import datetime
 
-def is_image_by_ext(filepath):
-    image_exts = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.tiff', '.svg', '.ico'}
-    ext = os.path.splitext(filepath)[1].lower()
-    return ext in image_exts
+image_mime_mapping = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".gif": "image/gif",
+    ".bmp": "image/bmp",
+    ".webp": "image/webp",
+    ".svg": "image/svg+xml",
+    ".tiff": "image/tiff",
+    ".ico": "image/x-icon",
+}
+
+def is_image_by_ext(file_path: Path):
+    ext = file_path.suffix.lower()
+    return ext in image_mime_mapping
+
+def guess_image_mime(file_path: Path) -> str:
+    """根据文件扩展名推断图片的 MIME 类型"""
+    return image_mime_mapping.get(file_path.suffix.lower(), "image/jpeg")
 
 class QwenPawRemoteClient:
     """通用Http连接器"""
@@ -162,10 +178,10 @@ class QwenPawRemoteClient:
             print(f"  x 读取文件失败：{e}")
             return ""
 
-    def prompt(
-            self,
+    def prompt(self,
             content: List[Dict],
             workspace: str | None = None,
+            system_prompt: List[Dict] | None = None,
             session_id: str = None
     ) -> Dict:
         """
@@ -174,6 +190,8 @@ class QwenPawRemoteClient:
         Args:
             content: 文件内容
             workspace: 工作路径
+            system_prompt： 系统提示词
+            session_id： 会话id
         Returns:
             Dict: 包含生成结果
         """
@@ -185,14 +203,13 @@ class QwenPawRemoteClient:
 
         if self.auth_token:
             headers["Authorization"] = f"Bearer {self.auth_token}"
+        intput = []
+        if system_prompt:
+            intput.append({"role":"system","content":system_prompt})
+        intput.append({"role": "user", "content": content})
 
         data = {
-            "input": [
-                {
-                    "role": "user",
-                    "content": content
-                }
-            ],
+            "input": intput,
             "session_id": session_id,
             "user_id": self.username or "molecode",
             "channel": "console",
@@ -208,13 +225,7 @@ class QwenPawRemoteClient:
         }
 
         try:
-            with requests.post(
-                    self.api_url,
-                    headers=headers,
-                    json=data,
-                    stream=True,
-                    timeout=600
-            ) as response:
+            with requests.post(self.api_url,headers=headers,json=data,timeout=600) as response:
                 if response.status_code != 200:
                     result["error"] = f"HTTP {response.status_code}: {response.text}"
                     return result
@@ -326,22 +337,25 @@ class QwenPawRemoteClient:
                 prompt.append({"type":"text","text":content})
             else:
                 # 读取文件
-                content = self.read_file(file_path)
-                if not content:
-                    print(f"  x 跳过（无法读取）")
-                    stats["failed_count"] += 1
-                    stats["files"].append({
-                        "file": file_path.name,
-                        "error": "无法读取文件",
-                        "success": False
-                    })
-                    continue
-                print(f"  读取成功 ({len(content)} 字符)")
                 if not is_image:
+                    content = self.read_file(file_path)
+                    if not content:
+                        print(f"  x 跳过（无法读取）")
+                        stats["failed_count"] += 1
+                        stats["files"].append({
+                            "file": file_path.name,
+                            "error": "无法读取文件",
+                            "success": False
+                        })
+                        continue
+                    print(f"  读取成功 ({len(content)} 字符)")
                     prompt.append({"type":"text","text":content})
                 else:
-                    base64_image = base64.b64encode(content).decode("utf-8")
-                    prompt.append({"type":"image","image_url":f"data:image/jpeg;base64,{base64_image}"})
+                    image_data = file_path.read_bytes()
+                    mime = guess_image_mime(image_path)
+                    b64 = base64.b64encode(image_data).decode("utf-8")
+                    prompt.append({"type": "image", "image_url": f"data:{mime};base64,{b64}"})
+
             print(f"  开始生成输出...")
 
             # 生成输出
@@ -398,3 +412,198 @@ class QwenPawRemoteClient:
         print("=" * 70)
         result['content'] = stats
         return result
+
+    def _build_image_block(self, image_ref: str, base_dir: Path) -> Dict | None:
+        """
+        将 markdown 中的图片引用转换为 image 块
+
+        Args:
+            image_ref: 图片引用（本地路径或远程 URL）
+            base_dir: markdown 文件所在目录，用于解析相对路径
+
+        Returns:
+            Dict | None: image 块，加载失败时返回 None
+        """
+        # 远程图片：直接使用 URL
+        if image_ref.startswith(("http://", "https://")):
+            return {"type": "image", "image_url": image_ref}
+
+        # 本地图片：相对路径基于 markdown 文件所在目录解析
+        image_path = Path(image_ref)
+        if not image_path.is_absolute():
+            image_path = base_dir / image_path
+
+        if not image_path.exists():
+            print(f"  x 图片不存在：{image_path}")
+            return None
+
+        try:
+            image_data = image_path.read_bytes()
+            mime = guess_image_mime(image_path)
+            b64 = base64.b64encode(image_data).decode("utf-8")
+            return {"type": "image", "image_url": f"data:{mime};base64,{b64}"}
+        except Exception as e:
+            print(f"  x 读取图片失败（{image_path}）：{e}")
+            return None
+
+    def _parse_markdown_blocks(self, markdown_content: str, base_dir: Path) -> List[Dict]:
+        """
+        将 markdown 内容解析为有序的块列表：
+        文本内容 -> text 块，图片引用 -> image 块
+
+        Args:
+            markdown_content: markdown 文本内容
+            base_dir: markdown 文件所在目录，用于解析图片相对路径
+
+        Returns:
+            List[Dict]: 按出现顺序排列的 text/image 块
+        """
+        blocks: List[Dict] = []
+        # 匹配 markdown 图片引用：![alt](path) 或 ![alt](path "title")
+        image_pattern = re.compile(
+            r'!\[([^\]]*)\]\(([^)\s]+)(?:\s+["\'][^"\']*["\'])?\)'
+        )
+
+        last_end = 0
+        for match in image_pattern.finditer(markdown_content):
+            # 图片引用之前的文本
+            text = markdown_content[last_end:match.start()]
+            if text.strip():
+                blocks.append({"type": "text", "text": text})
+
+            alt = match.group(1)
+            image_ref = match.group(2)
+            image_block = self._build_image_block(image_ref, base_dir)
+            if image_block:
+                blocks.append(image_block)
+            else:
+                # 图片加载失败，回退为文本提示
+                blocks.append({"type": "text", "text": f"[图片无法加载: {alt or image_ref}]"})
+
+            last_end = match.end()
+
+        # 末尾剩余的文本
+        tail = markdown_content[last_end:]
+        if tail.strip():
+            blocks.append({"type": "text", "text": tail})
+
+        return blocks
+
+    def ask_markdown(self,
+            prompt: List[Dict],
+            system_prompt: List[Dict],
+            directory: List[str]|str,
+            session_id: str = ""
+    ) -> Dict:
+        """
+        将 markdown 文件发送给多模态大模型，逐块发送：
+        遇到文本发送 text 块，遇到图片发送 image 块。
+
+        Args:
+            prompt: 用户提示词
+            directory: markdown 文件路径，或包含 markdown 文件的目录（单个或列表）
+            session_id: 会话 ID
+
+        Returns:
+            Dict: 发送结果，单个文件时直接返回该文件的生成结果
+        """
+        # 收集 markdown 文件
+        paths = directory if isinstance(directory, list) else [directory]
+        md_files: List[Path] = []
+        for p in paths:
+            p = Path(p)
+            if p.is_file():
+                if p.suffix.lower() in (".md", ".markdown"):
+                    md_files.append(p)
+            elif p.is_dir():
+                md_files.extend(sorted(
+                    f for f in p.rglob("*")
+                    if f.is_file()
+                    and f.suffix.lower() in (".md", ".markdown")
+                    and not f.name.startswith('.')
+                ))
+
+        if not md_files:
+            print("x 未找到任何 markdown 文件")
+            return {"success": False, "error": "未找到 markdown 文件"}
+
+        print(f"找到 {len(md_files)} 个 markdown 文件:\n")
+        for i, f in enumerate(md_files, 1):
+            print(f"  {i}. {str(f)}")
+        print()
+
+        results: List[Dict] = []
+        last_result: Dict | None = None
+
+        for i, md_file in enumerate(md_files, 1):
+            print(f"\n[{i}/{len(md_files)}] 发送：{md_file.name}")
+            print("-" * 70)
+
+            # 读取 markdown 内容
+            try:
+                markdown_content = md_file.read_text(encoding="utf-8")
+            except UnicodeDecodeError:
+                try:
+                    markdown_content = md_file.read_text(encoding="gbk")
+                except Exception as e:
+                    print(f"  x 读取失败：{e}")
+                    results.append({"file": str(md_file), "success": False, "error": str(e)})
+                    continue
+            except Exception as e:
+                print(f"  x 读取失败：{e}")
+                results.append({"file": str(md_file), "success": False, "error": str(e)})
+                continue
+
+            # 解析为 text/image 块
+            blocks = self._parse_markdown_blocks(markdown_content, md_file.parent)
+            if not blocks:
+                print("  x 没有可发送的内容")
+                results.append({"file": str(md_file), "success": False, "error": "没有可发送的内容"})
+                continue
+
+            text_count = sum(1 for b in blocks if b.get("type") == "text")
+            image_count = sum(1 for b in blocks if b.get("type") == "image")
+            print(f"  解析出 {len(blocks)} 个块（文本 {text_count}，图片 {image_count}）")
+
+            msg = []
+            msg.append({"type":"text","text": f"\n<document filename=\"{md_file.name}>\"\n"})
+            msg.extend(blocks)
+            msg.append({"type":"text","text":"\n</document>\n<question>\n"})
+            msg.extend(prompt)
+            msg.append({"type":"text","text":"\n</question>\n"})
+            # 发送给多模态大模型
+            result = self.prompt(
+                content=msg,
+                workspace=str(md_file.parent),
+                system_prompt=system_prompt,
+                session_id=session_id
+            )
+            result["file"] = str(md_file)
+            results.append(result)
+            last_result = result
+
+            if result.get("success"):
+                print("  发送成功")
+            else:
+                print(f"  x 发送失败：{result.get('error')}")
+
+        if len(md_files) == 1 and last_result is not None:
+            return last_result
+
+        total = len(results)
+        success_count = sum(1 for r in results if r.get("success"))
+        failed_count = total - success_count
+
+        print("\n" + "=" * 70)
+        print("发送完成统计")
+        print("=" * 70)
+        print(f"总文件数：{total}")
+        print(f"成功：{success_count}")
+        print(f"失败：{failed_count}")
+        print("=" * 70)
+
+        return {
+            "success": failed_count == 0,
+            "content": results,
+            "error": None if failed_count == 0 else f"{failed_count} 个文件发送失败"
+        }

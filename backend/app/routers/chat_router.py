@@ -17,6 +17,8 @@ from app.schemas.chat import ChatRequest, ChatResponse
 from app.schemas.healthcheck import HealthCheck
 
 logger = logging.getLogger(__name__)
+system_prompt = "你是一个文档问答助手。请仅在用户提供的工作区读写文件，你当前要处理的文档是%s。如果文档中不包含答案，请明确说明，不要编造。"
+system_markdown_prompt = "你是一个文档问答助手。请仅根据用户提供的Markdown文档内容（在<document>中）回答问题。如果文档中不包含答案，请明确说明，不要编造。"
 
 router = APIRouter(
     prefix="/chat",
@@ -70,14 +72,13 @@ def _resolve_document_dir(pdf_filename: str | None) -> str:
         seg_safe_name = re.sub(r"[^\w.-]", "_", original_filename)
         pdf_stem = os.path.splitext(seg_safe_name)[0]
         segments_dir = os.path.join(SEGMENTS_DIR, pdf_stem)
-
         if os.path.isdir(segments_dir):
-            return segments_dir
+            return segments_dir,f"{pdf_stem}.md"
         logger.warning(
             "Chat requested for unknown document '%s', falling back to PDF_DIR",
             segments_dir,
         )
-    return None
+    return None,None
 
 
 @router.post(
@@ -108,7 +109,7 @@ def ask_question(request: ChatRequest) -> ChatResponse:
             detail="Question must not be empty",
         )
 
-    document_dir = _resolve_document_dir(request.pdf_filename)
+    document_dir,md_file = _resolve_document_dir(request.pdf_filename)
     logger.info(
         "Chat question received (document dir: %s, session: %s)",
         document_dir,
@@ -123,11 +124,24 @@ def ask_question(request: ChatRequest) -> ChatResponse:
             password=QWENPAW_PASSWORD,
         )
 
-        result = client.prompt(
-            content=[{"type": "text", "text": question}],
-            save_to_path=document_dir,
-            session_id=request.session_id,
-        )
+        # "Only send path" (default): pass only the question and let the
+        # agent resolve the document files from the workspace path. When the
+        # option is disabled (or no document is loaded), send the document's
+        # markdown content (text and images) directly via ``ask_markdown``.
+        if request.only_path or not document_dir:
+            result = client.prompt(
+                content=[{"type": "text", "text": question}],
+                workspace=document_dir,
+                system_prompt=[{"type": "text", "text": system_prompt % md_file}],
+                session_id=request.session_id,
+            )
+        else:
+            result = client.ask_markdown(
+                prompt=[{"type": "text", "text": question}],
+                system_prompt=[{"type": "text", "text": system_markdown_prompt}],
+                directory=document_dir+os.path.sep+md_file,
+                session_id=request.session_id,
+            )
     except Exception as e:
         logger.exception("Failed to reach QwenPaw agent")
         raise HTTPException(
@@ -141,8 +155,19 @@ def ask_question(request: ChatRequest) -> ChatResponse:
             detail=result.get("error") or "QwenPaw agent returned an error",
         )
 
+    # ``ask_markdown`` returns a single string when there is one document, but
+    # a list of per-file results when there are several. Normalize to a string
+    # so the response model stays valid.
+    answer = result.get("content", "")
+    if not isinstance(answer, str):
+        answer = "\n\n".join(
+            str(item.get("content", ""))
+            for item in answer
+            if isinstance(item, dict)
+        )
+
     return ChatResponse(
-        answer=result.get("content", ""),
+        answer=answer,
         session_id=request.session_id,
         document_dir=document_dir,
     )
