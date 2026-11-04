@@ -132,7 +132,7 @@ async def extract_doi(
             - 500: If DOI extraction fails
 
     Example:
-        >>> result = await extract_doi(pdf_file)
+        >>> result = extract_doi(pdf_file)
         >>> print(result['doi'])
         "10.1021/acs.jcim.2c00934"
     """

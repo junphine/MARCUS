@@ -123,7 +123,7 @@ async def extract_pdf_json(
 
         # Process the PDF file
         if not os.path.exists(json_path):
-            from app.modules.docling_segmentation_wrapper import get_segments_with_bbox_docling
+            from app.modules.docling_serve_wrapper import get_segments_with_bbox_docling
             get_segments_with_bbox_docling(file_path,None)
 
         # Process the PDF file

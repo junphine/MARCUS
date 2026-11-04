@@ -47,7 +47,7 @@ class DoclingParser(ExternalParserBase):
         )
 
     def build_ir(self, raw_dir: Path, document_name: str) -> "IRDoc":
-        from .docling import DoclingIRBuilder
+        from .ir_builder import DoclingIRBuilder
 
         return DoclingIRBuilder().normalize_from_workdir(
             raw_dir, document_name=document_name

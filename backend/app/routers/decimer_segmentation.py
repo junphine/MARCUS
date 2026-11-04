@@ -15,10 +15,11 @@ from fastapi.responses import FileResponse
 from app.schemas.healthcheck import HealthCheck
 from app.schemas.error import BadRequestModel, ErrorResponse, NotFoundModel
 from app.config import PDF_DIR, SEGMENTS_DIR
-from app.modules.docling_segmentation_wrapper import (
+
+from app.modules.docling_serve_wrapper import (
     get_complete_segments,
-    segments_exist,
     get_highlighted_segment_image,
+    segments_exist,
 )
 
 router = APIRouter(

@@ -131,8 +131,23 @@ export default {
       return file ? file.name : null
     },
 
+    currentPdfId() {
+      return this.$store.state.pdf.currentPdfId
+    },
+
     canSend() {
       return this.inputText.trim().length > 0 && !this.isLoading
+    }
+  },
+
+  watch: {
+    // Clear the conversation when a new document is uploaded so the previous
+    // document's chat history does not leak into the new document's context.
+    currentPdfId(newId, oldId) {
+      if (newId && newId !== oldId) {
+        this.messages = []
+        this.chatSessionId = this.generateSessionId()
+      }
     }
   },
 

@@ -658,7 +658,10 @@ async def extract_pdf_text_with_headers(
                 content = await pdf_file.read()
                 buffer.write(content)
         if not os.path.exists(json_path):
-            from .docling_segmentation_wrapper import get_segments_with_bbox_docling
+            if os.getenv("DOCLING_ENDPOINT"):
+                from .docling_serve__wrapper import get_segments_with_bbox_docling
+            else:
+                from .docling_segmentation_wrapper import get_segments_with_bbox_docling
             get_segments_with_bbox_docling(file_path,None)
 
         # Process the PDF file
@@ -838,7 +841,10 @@ async def extract_pdf_markdown(
         else:
             path_to_convert = extract_first_pages(file_path, pages)
 
-        from .docling_segmentation_wrapper import get_segments_with_bbox_docling
+        if os.getenv("DOCLING_ENDPOINT"):
+            from .docling_serve__wrapper import get_segments_with_bbox_docling
+        else:
+            from .docling_segmentation_wrapper import get_segments_with_bbox_docling
 
         _,_,markdown_text = get_segments_with_bbox_docling(path_to_convert,None)
 
