@@ -38,6 +38,7 @@ from fastapi import HTTPException, status
 from app.config import SEGMENTS_DIR
 from app.modules.parser.docling import DoclingRawClient
 from app.modules.parser.docling.manifest import select_main_json, select_main_md
+from app.modules.ocsr_wrapper import detect_chemical_structure
 
 # Thread-safe dictionary with lock for concurrent access
 segment_info_lock = threading.Lock()
@@ -257,8 +258,11 @@ def _rewrite_markdown_images(markdown_text: str, pictures: List[Any]) -> str:
     if not markdown_text:
         return markdown_text
 
-    # docling's local exporter emits ``<!-- image -->`` placeholders; replace
-    # them with segment-relative links (parity with the local wrapper).
+    # docling emits one image reference per picture, in document order. The
+    # local exporter emits ``<!-- image -->`` placeholders; the remote
+    # docling-serve exporter (``image_export_mode=referenced``) emits
+    # ``![Image](artifacts/image_NNNNNN_<hash>.<ext>)`` links. Replace both
+    # with segment-relative links (parity with the local wrapper).
     image_index = 0
 
     def _image_replacer(_match):
@@ -266,10 +270,15 @@ def _rewrite_markdown_images(markdown_text: str, pictures: List[Any]) -> str:
         image_index += 1
         return f"![Figure {image_index}](images/picture_{image_index}_segmented.png)"
 
-    markdown_text = re.sub(r"<!--\s*image\s*-->", _image_replacer, markdown_text)
+    markdown_text = re.sub(
+        r"<!--\s*image\s*-->|!\[[^\]]*\]\(\s*artifacts/[^)\s]+\)",
+        _image_replacer,
+        markdown_text,
+    )
 
-    # docling-serve typically references the artifact files directly, so map
-    # those relative URIs onto the segment images as well.
+    # docling-serve may also reference artifact files whose URI does not appear
+    # inside an ``![...](...)`` link; map those relative URIs onto the segment
+    # images as well.
     for n, picture in enumerate(pictures, start=1):
         if not isinstance(picture, dict):
             continue
@@ -347,16 +356,22 @@ def extract_picture_segments_from_pdf(
                     with open(segment_path, "wb") as fh:
                         fh.write(image_bytes)
 
+                # Detect whether the picture contains a chemical structure
+                contains_chems = (
+                    detect_chemical_structure(segment_path)
+                    if os.path.exists(segment_path)
+                    else []
+                )
+
                 bbox, page_number = _picture_provenance(picture)
                 segment_metadata = {
                     "segment_id": f"picture-{picture_counter}",
                     "filename": segment_filename,
                     "path": os.path.join("images", segment_filename),
-                    "full_path": segment_path,
                     "pageNumber": page_number,
-                    "bbox": bbox,
                     "segmentNumber": picture_counter,
-                    "pdfFilename": os.path.basename(file_path),
+                    "bbox": bbox,
+                    "chemical_bboxes": contains_chems,
                 }
                 segments_metadata.append(segment_metadata)
 
@@ -386,11 +401,13 @@ def get_segments_with_bbox_docling(
 ) -> Tuple[str, List[Dict[str, Any]], str]:
     """Extract segments from PDF using remote docling-serve."""
     if os.getenv("DOCLING_ENDPOINT"):
-        return extract_picture_segments_from_pdf(file_path, progress_callback)
+        base_directory,segments_metadata,md = extract_picture_segments_from_pdf(file_path, progress_callback)
+
     else:
         from .docling_segmentation_wrapper import extract_picture_segments_from_pdf as extract_picture_segments_from_pdf_local
-        return extract_picture_segments_from_pdf_local(file_path, progress_callback)
+        base_directory,segments_metadata,md = extract_picture_segments_from_pdf_local(file_path, progress_callback)
 
+    return base_directory,segments_metadata,md
 
 
 def get_complete_segments(path_to_pdf: str, collect_all: bool = True) -> Dict[str, Any]:
@@ -424,6 +441,7 @@ def get_complete_segments(path_to_pdf: str, collect_all: bool = True) -> Dict[st
                     segments_metadata = generate_basic_metadata(
                         all_segments_dir, pdf_filename
                     )
+                    save_segment_metadata(segment_directory,segments_metadata)
 
             if segments_metadata:
                 with thread_safe_dict_access(segment_info_lock):
@@ -436,6 +454,8 @@ def get_complete_segments(path_to_pdf: str, collect_all: bool = True) -> Dict[st
             pdf_filename = os.path.basename(path_to_pdf)
             with thread_safe_dict_access(segment_info_lock):
                 stored_segment_info[pdf_filename] = segments_metadata
+
+            save_segment_metadata(segment_directory,segments_metadata)
 
         all_segments_dir = os.path.join(segment_directory, "images")
         result = {
@@ -472,16 +492,18 @@ def generate_basic_metadata(
                 try:
                     idx = int(parts[1])
                     segment_id = f"picture-{idx}"
+                    full_path = os.path.join(all_segments_dir, segment_file)
+                    # Detect whether the picture contains a chemical structure
+                    contains_chems = detect_chemical_structure(full_path)
 
                     segment_metadata = {
                         "segment_id": segment_id,
                         "filename": segment_file,
                         "path": os.path.join("images", segment_file),
-                        "full_path": os.path.join(all_segments_dir, segment_file),
                         "pageNumber": 0,
                         "segmentNumber": idx + 1,
-                        "pdfFilename": pdf_filename,
                         "bbox": [0, 0, 1000, 1000],
+                        "chemical_bboxes": contains_chems,
                     }
 
                     segments_metadata.append(segment_metadata)
@@ -617,17 +639,3 @@ def cleanup_caches():
         except Exception:
             pass
 
-
-__all__ = [
-    "cleanup_caches",
-    "create_output_directory",
-    "extract_picture_segments_from_pdf",
-    "generate_basic_metadata",
-    "get_complete_segments",
-    "get_highlighted_segment_image",
-    "get_pdf_hash",
-    "get_segments_with_bbox_docling",
-    "load_segment_metadata",
-    "save_segment_metadata",
-    "segments_exist",
-]

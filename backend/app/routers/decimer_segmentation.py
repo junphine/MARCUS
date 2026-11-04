@@ -100,7 +100,7 @@ async def extract_segments(
             - 500: If segmentation processing fails
 
     Example:
-        >>> result = await extract_segments(pdf_file, collect_all=True)
+        >>> result = extract_segments(pdf_file, collect_all=True)
         >>> print(f"Found {result['segments_count']} segments")
         Found 8 segments
     """
@@ -177,6 +177,7 @@ async def extract_segments(
             "segments_extracted": True,
             "segments_already_existed": segments_result.get("segments_existed", False),
             "segments_count": segments_count,
+            "segments_info": segments_result.get("segments_info", []),
             "segments_directory": all_segments_rel_path.replace('\\','/'),
             "process_completed": True,
             "pdf_filename": safe_filename,
@@ -215,7 +216,7 @@ async def list_segments():
         HTTPException: 500 if directory listing fails
 
     Example:
-        >>> result = await list_segments()
+        >>> result = list_segments()
         >>> print(len(result['segment_directories']))
         5
     """
@@ -292,7 +293,7 @@ async def get_segment_image(
             - 500: File retrieval error
 
     Example:
-        >>> response = await get_segment_image("chemistry_paper", "page_0_1_segmented.png")
+        >>> response = get_segment_image("chemistry_paper", "page_0_1_segmented.png")
         >>> print(response.media_type)
         "image/png"
     """
@@ -427,7 +428,7 @@ async def list_directory(directory: str, subdirectory: str = None):
             - 500: Directory listing error
 
     Example:
-        >>> result = await list_directory("chemistry_paper", "images")
+        >>> result = list_directory("chemistry_paper", "images")
         >>> print(len(result['files']))
         8
     """
@@ -501,7 +502,7 @@ async def get_highlighted_page(
             - 500: Image generation error
 
     Example:
-        >>> response = await get_highlighted_page("page_0_1_segmented.png", "chemistry_paper.pdf")
+        >>> response = get_highlighted_page("page_0_1_segmented.png", "chemistry_paper.pdf")
         >>> print(response.filename)
         "highlighted_segment-0-1_a1b2c3d4.png"
     """

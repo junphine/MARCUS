@@ -20,6 +20,7 @@ from app.modules.pdf_wrapper import (
     extract_pdf_markdown,
     get_doi_from_file,
 )
+from app.modules.docling_serve_wrapper import get_segments_with_bbox_docling
 from app.security.file_validator import validate_pdf_upload
 
 
@@ -123,7 +124,6 @@ async def extract_pdf_json(
 
         # Process the PDF file
         if not os.path.exists(json_path):
-            from app.modules.docling_serve_wrapper import get_segments_with_bbox_docling
             get_segments_with_bbox_docling(file_path,None)
 
         # Process the PDF file

@@ -230,6 +230,7 @@ export default {
           commit("SET_SEGMENT_INFO", {
             count: response.segments_count,
             directory: response.segments_directory,
+            info: response.segments_info,
             alreadyExisted: response.segments_already_existed,
             pdfFilename: response.pdf_filename,
             pdfId: state.currentPdfId, // Store PDF ID with segment info

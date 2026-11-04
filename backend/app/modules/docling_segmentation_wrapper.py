@@ -19,6 +19,7 @@ import time
 from contextlib import contextmanager
 
 from app.config import PDF_DIR, SEGMENTS_DIR, MODELS_DIR
+from app.modules.ocsr_wrapper import detect_chemical_structure
 
 
 # Configure Docling to generate picture images
@@ -184,6 +185,9 @@ def extract_picture_segments_from_pdf(
                     # Save the image
                     cv2.imwrite(segment_path, img_array)
 
+                    # Detect whether the picture contains a chemical structure
+                    contains_chems = detect_chemical_structure(segment_path)
+
                     # Extract bounding box information
                     # Get the bounding box from the element's provenance
                     bbox = [0, 0, 0, 0]  # Default fallback
@@ -207,11 +211,10 @@ def extract_picture_segments_from_pdf(
                         "segment_id": segment_id,
                         "filename": segment_filename,
                         "path": os.path.join("images", segment_filename),
-                        "full_path": segment_path,
                         "pageNumber": page_number,
-                        "bbox": bbox,  # [x0, y0, x1, y1]
                         "segmentNumber": picture_counter,
-                        "pdfFilename": os.path.basename(file_path),
+                        "bbox": bbox,  # [x0, y0, x1, y1]
+                        "chemical_bboxes": contains_chems,
                     }
 
                     segments_metadata.append(segment_metadata)

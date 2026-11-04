@@ -35,6 +35,35 @@ def _get_detector():
     return _DETECTOR
 
 
+def detect_chemical_structure(image_path: Union[str, Path]) -> bool:
+    """
+    Detect whether an image contains a chemical structure.
+
+    Uses the MolDetv2 YOLO detector. Any detection box is treated as a
+    chemical structure being present in the image.
+
+    Args:
+        image_path: Path to the image to inspect.
+
+    Returns:
+        True if at least one chemical structure is detected, otherwise False.
+    """
+    try:
+        det = _get_detector()
+        with contextlib.redirect_stdout(sys.stderr):
+            results = det.predict(str(image_path), imgsz=960, conf=0.3, verbose=False)
+        boxes = []
+        for r in results:
+            for b in r.boxes:
+                xyxy = [float(x) for x in b.xyxy[0].tolist()]
+                boxes.append(xyxy)
+                #boxes.append({"xyxy": xyxy, "conf": float(b.conf[0])})
+        return boxes
+    except Exception as e:
+        print(f"Error detecting chemical structure in {image_path}: {str(e)}")
+        return []
+
+
 
 
 def init_molparser():

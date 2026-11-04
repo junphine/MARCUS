@@ -7,7 +7,7 @@ from PyPDF2 import PdfReader, PdfWriter
 from typing import List, Optional, Tuple, Dict, Any
 from app.config import PDF_DIR, SEGMENTS_DIR, MODELS_DIR
 from functools import lru_cache
-
+from .docling_serve_wrapper import get_segments_with_bbox_docling
 
 @lru_cache(maxsize=128)
 def get_doi_from_file(filepath: str) -> Dict[str, str]:
@@ -658,10 +658,6 @@ async def extract_pdf_text_with_headers(
                 content = await pdf_file.read()
                 buffer.write(content)
         if not os.path.exists(json_path):
-            if os.getenv("DOCLING_ENDPOINT"):
-                from .docling_serve__wrapper import get_segments_with_bbox_docling
-            else:
-                from .docling_segmentation_wrapper import get_segments_with_bbox_docling
             get_segments_with_bbox_docling(file_path,None)
 
         # Process the PDF file
@@ -840,11 +836,6 @@ async def extract_pdf_markdown(
             path_to_convert = file_path
         else:
             path_to_convert = extract_first_pages(file_path, pages)
-
-        if os.getenv("DOCLING_ENDPOINT"):
-            from .docling_serve__wrapper import get_segments_with_bbox_docling
-        else:
-            from .docling_segmentation_wrapper import get_segments_with_bbox_docling
 
         _,_,markdown_text = get_segments_with_bbox_docling(path_to_convert,None)
 
