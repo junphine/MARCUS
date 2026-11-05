@@ -267,9 +267,8 @@ export default {
               id: `page-${pageIndex}-segment-${segmentNumber}`,
               filename,
               path: fullPath,
-              pageNumber: pageIndex + 1, // 1-based page number for display
+              pageNumber: pageIndex, // 1-based page number for display
               segmentNumber,
-              pageIndex, // 0-based page index
               bbox: info.bbox || null,
               chemicalBboxes: info.chemical_bboxes || [],
               pdfId: state.currentPdfId,
@@ -444,8 +443,8 @@ export default {
             engine: result.engine || processingOptions.engine,
             error: result.error || null,
             pdfId: result.pdfId || state.currentPdfId, // Ensure PDF ID is set
-            pageIndex: result.pageIndex || 0,
-            segmentIndex: result.segmentIndex || 0,
+            pageNumber: result.pageNumber || 0,
+            segmentNumber: result.segmentNumber || 0,
             uniqueKey:
               result.uniqueKey || `pdf-${state.currentPdfId}-${segmentId}`,
             // Use the result's name or fallback to a default - FIX FOR UNDEFINED SEGMENT

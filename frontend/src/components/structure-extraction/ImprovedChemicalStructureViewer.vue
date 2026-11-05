@@ -1,40 +1,68 @@
 <template>
   <div class="chemical-structure-viewer">
-    <div v-if="!smilesList.length && !molfileList.length" class="empty-state">
+    <div v-if="!structures.length" class="empty-state">
       <p>No structure data available</p>
     </div>
 
     <div v-else class="structure-content">
+      <div v-if="isLoading" class="loading-bar">
+        <vue-feather type="loader" class="loading-icon spin"></vue-feather>
+        <p>Generating depiction...</p>
+      </div>
 
-      <div class="structure-display">
-        <div v-if="isLoading" class="loading-overlay">
-          <vue-feather type="loader" class="loading-icon spin"></vue-feather>
-          <p>Generating depiction...</p>
-        </div>
+      <div class="structures-list">
+        <div v-for="(structure, index) in structures" :key="index" class="structure-item">
+          <div class="structure-display">
+            <!-- SVG depiction container -->
+            <div v-if="depictions[index] && depictionFormat === 'svg'" class="svg-container"
+              v-html="sanitizeCdkSvg(depictions[index])">
+            </div>
 
-        <!-- SVG depiction container -->
-        <div v-if="depictionData && depictionFormat === 'svg'" class="svg-container" v-html="sanitizedSvg">
-        </div>
+            <!-- Base64 image container -->
+            <img v-else-if="depictions[index] && depictionFormat === 'base64'"
+              :src="'data:image/png;base64,' + depictions[index]" class="structure-image"
+              alt="Chemical structure" />
 
-        <!-- Base64 image container -->
-        <img v-else-if="depictionData && depictionFormat === 'base64'" :src="'data:image/png;base64,' + depictionData"
-          class="structure-image" alt="Chemical structure" />
+            <!-- Fallback container -->
+            <div v-else class="fallback-container">
+              <p class="smiles-fallback">{{ structure.smiles }}</p>
+            </div>
+          </div>
 
-        <!-- Fallback container -->
-        <div v-else class="fallback-container">
-          <p class="smiles-fallback">{{ truncatedSmiles }}</p>
+          <div class="structure-item-footer">
+            <span v-if="structures.length > 1" class="structure-index">{{ index + 1 }}</span>
+            <div class="structure-actions">
+              <button v-if="structure.smiles" class="btn-action" @click="copySmiles(index)"
+                title="Copy SMILES">
+                <vue-feather type="copy" size="14"></vue-feather>
+              </button>
+              <button v-if="editable" class="btn-action edit-btn" @click="openEditor(index)"
+                title="Edit Structure">
+                <vue-feather type="edit-3" size="14"></vue-feather>
+                <span>Edit Structure</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
+
+      <KetcherEditorModal :visible="showEditor" :initial-smiles="editorSmiles"
+        :initial-molfile="editorMolfile" @close="closeEditor" @apply="onEditorApply"
+        @error="onEditorError" />
     </div>
   </div>
 </template>
 
 <script>
 import depictionService from '@/services/depictionService'
-import { primary, joinValue, toList } from '@/utils/structure'
+import KetcherEditorModal from './KetcherEditorModal.vue'
+import { toList } from '@/utils/structure'
 
 export default {
   name: 'ImprovedChemicalStructureViewer',
+  components: {
+    KetcherEditorModal
+  },
   props: {
     smiles: {
       type: [String, Array],
@@ -62,16 +90,24 @@ export default {
     highlight: {
       type: String,
       default: ''
+    },
+    // Whether to show the "Edit Structure" action
+    editable: {
+      type: Boolean,
+      default: false
     }
   },
+  emits: ['copied', 'error', 'download-complete', 'depiction-complete', 'structure-edited'],
   data() {
     return {
-      isLoading: true, // Start with loading state true by default
-      depictionData: null,
+      isLoading: true,
+      depictions: [],
       depictionFormat: 'svg',
       depictionError: null,
       usingMolfile: false,
-      initialized: false // Add flag to track initialization
+      initialized: false,
+      showEditor: false,
+      editingIndex: null
     }
   },
   computed: {
@@ -81,10 +117,19 @@ export default {
     molfileList() {
       return toList(this.molfile)
     },
-    truncatedSmiles() {
-      const value = joinValue(this.smiles, '\n')
-      if (!value) return ''
-      return value.length > 30 ? value.substring(0, 27) + '...' : value
+    // Pair smiles and molfile by index so each structure is rendered separately.
+    structures() {
+      const smiles = this.smilesList
+      const molfiles = this.molfileList
+      const count = Math.max(smiles.length, molfiles.length)
+      const items = []
+      for (let i = 0; i < count; i++) {
+        items.push({
+          smiles: smiles[i] || '',
+          molfile: molfiles[i] || ''
+        })
+      }
+      return items
     },
     shouldUseMolfile() {
       // Use molfile if available AND either:
@@ -97,122 +142,75 @@ export default {
           (this.sourceEngine === 'molparser' &&
             this.useCoordinates !== false))
     },
-    sanitizedSvg() {
-      if (!this.depictionData) return '';
-
-      // For CDK SVG, we need to clean it up
-      return this.sanitizeCdkSvg(this.depictionData);
+    editorSmiles() {
+      if (this.editingIndex == null) return ''
+      return (this.structures[this.editingIndex] || {}).smiles || ''
     },
-    // Added computed property for engine class
-    engineClass() {
-      if (this.sourceEngine === 'molecode') return 'decimer-tag';
-      if (this.sourceEngine === 'molparser') return 'molparser-tag';
-      return '';
-    },
-    // Added computed property for engine label
-    engineLabel() {
-      if (this.sourceEngine === 'molecode') return 'MoleCode';
-      if (this.sourceEngine === 'molparser') return 'MolParser';
-      return this.sourceEngine || 'Unknown engine';
+    editorMolfile() {
+      if (this.editingIndex == null) return ''
+      // MoleCode's "molfile" is actually a mermaid graph, not a real molfile,
+      // so Ketcher cannot parse it - only pass real molfiles to the editor.
+      if (this.sourceEngine === 'molecode') return ''
+      return (this.structures[this.editingIndex] || {}).molfile || ''
     }
   },
   watch: {
     smiles() {
-      this.generateDepiction()
+      this.generateDepictions()
     },
     molfile() {
-      this.generateDepiction()
+      this.generateDepictions()
     },
     useCoordinates() {
-      // Regenerate depiction if useCoordinates changes
-      this.generateDepiction()
+      this.generateDepictions()
     },
     highlight() {
-      // Regenerate depiction if highlight pattern changes
-      this.generateDepiction()
+      this.generateDepictions()
     }
   },
   mounted() {
-    // Initialize the component with a slight delay to ensure proper timing
     this.$nextTick(() => {
-      this.generateDepiction();
+      this.generateDepictions();
     });
   },
   methods: {
-    async generateDepiction() {
-      if (!this.smilesList.length && !this.molfileList.length) return
+    async generateDepictions() {
+      const structures = this.structures
+      if (!structures.length) {
+        this.depictions = []
+        this.isLoading = false
+        return
+      }
 
-      // Set loading state and initialize flag
       this.isLoading = true
       this.depictionError = null
 
+      const isMolecode = this.sourceEngine === 'molecode'
+
       try {
-        // Log initialization status
         if (!this.initialized) {
-          console.log(`[Depiction] Starting initial depiction for ${this.name || 'unknown structure'} with engine ${this.sourceEngine}`);
-          console.log(`[Depiction] UseCoordinates setting: ${this.useCoordinates}`);
-          console.log(`[Depiction] Has molfile: ${this.molfileList.length > 0}`);
+          console.log(`[Depiction] Starting depiction for ${this.name || 'unknown structure'} with engine ${this.sourceEngine}`);
+          console.log(`[Depiction] Rendering ${structures.length} structure(s)`);
         }
 
-        // Determine whether to use the molfile for depiction
-        this.usingMolfile = this.shouldUseMolfile
+        const results = await Promise.all(
+          structures.map((structure) => this.generateOne(structure, isMolecode))
+        )
 
-        // MoleCode results are rendered with the mermaid engine (their
-        // molfile is a mermaid graph); everything else uses CDK
-        const isMolecode = this.sourceEngine === 'molecode'
-
-        // Set up options for the depiction service
-        const options = {
-          engine: isMolecode ? 'mermaid' : 'cdk',
-          width: 400,
-          height: 300,
-          format: 'svg',
-          kekulize: true,
-          cip: true,
-          unicolor: false
-        }
-
-        // Include SMILES when available
-        if (this.smilesList.length) {
-          options.smiles = primary(this.smiles)
-        }
-
-        // Always include the molfile when available: mermaid renders the
-        // MoleCode graph directly, and CDK uses the molfile coordinates
-        // when use_molfile_directly is set
-        if (this.molfileList.length) {
-          console.log(`[Depiction] Including molfile for ${this.name || 'structure'} (${this.sourceEngine})`);
-          options.molfile = primary(this.molfile)
-          // snake_case so the backend pydantic model picks it up
-          options.use_molfile_directly = this.usingMolfile
-        }
-
-        // Add highlight pattern if provided
-        if (this.highlight) {
-          options.highlight = this.highlight
-        }
-
-        // Generate the depiction
-        const result = await depictionService.generateDepiction(options)
-
-        // Store the depiction data and format
-        this.depictionData = result
+        this.depictions = results
         this.depictionFormat = 'svg'
         this.initialized = true
 
-        console.log(`[Depiction] Successfully generated depiction for ${this.name || 'structure'} (${this.sourceEngine}) with ${options.engine} using ${this.usingMolfile ? 'molfile' : 'SMILES'}`);
-
+        console.log(`[Depiction] Successfully generated ${results.length} depiction(s) for ${this.name || 'structure'}`);
       } catch (error) {
         console.error(`[Depiction] Error generating depiction for ${this.sourceEngine}:`, error)
         this.depictionError = error.message || 'Failed to generate depiction'
-        this.depictionData = null
+        this.depictions = []
 
-        // Emit error event
         this.$emit('error', this.depictionError)
       } finally {
         this.isLoading = false
 
-        // Notify parent that depiction is complete (successful or not)
         this.$emit('depiction-complete', {
           engine: this.sourceEngine,
           success: !this.depictionError,
@@ -220,22 +218,83 @@ export default {
         });
       }
     },
+    async generateOne(structure, isMolecode) {
+      const options = {
+        engine: isMolecode ? 'mermaid' : 'cdk',
+        width: 400,
+        height: 300,
+        format: 'svg',
+        kekulize: true,
+        cip: true,
+        unicolor: false
+      }
+
+      if (structure.smiles) {
+        options.smiles = structure.smiles
+      }
+
+      // mermaid renders the MoleCode graph directly; CDK uses molfile
+      // coordinates when use_molfile_directly is set.
+      if (structure.molfile) {
+        options.molfile = structure.molfile
+        options.use_molfile_directly = this.shouldUseMolfile
+      }
+
+      if (this.highlight) {
+        options.highlight = this.highlight
+      }
+
+      return await depictionService.generateDepiction(options)
+    },
+    openEditor(index) {
+      this.editingIndex = index
+      this.showEditor = true
+    },
+    closeEditor() {
+      this.showEditor = false
+      this.editingIndex = null
+    },
+    onEditorApply(payload) {
+      if (!payload || !payload.smiles) {
+        this.$emit('error', 'No structure returned from editor')
+        this.closeEditor()
+        return
+      }
+
+      const index = this.editingIndex != null ? this.editingIndex : 0
+
+      // Build the updated lists, replacing the edited structure in place.
+      const newSmiles = [...this.smilesList]
+      const newMolfiles = [...this.molfileList]
+      newSmiles[index] = payload.smiles
+      if (index < newMolfiles.length) {
+        newMolfiles[index] = payload.molfile || newMolfiles[index]
+      } else if (payload.molfile) {
+        newMolfiles[index] = payload.molfile
+      }
+
+      this.$emit('structure-edited', {
+        index,
+        smiles: newSmiles,
+        molfile: newMolfiles
+      })
+
+      this.closeEditor()
+    },
+    onEditorError(message) {
+      this.$emit('error', message)
+    },
     sanitizeCdkSvg(svgString) {
       if (!svgString) return '';
 
       try {
-        // Step 1: Replace namespace prefixes in tags
         let cleanedSvg = svgString.replace(/<ns0:/g, '<')
           .replace(/<\/ns0:/g, '</')
           .replace(/<\/ns0:SVG>/g, '</svg>');
 
-        // Step 2: Ensure the root SVG tag has proper attributes
         cleanedSvg = cleanedSvg.replace(/<svg/i, '<svg xmlns="http://www.w3.org/2000/svg"');
-
-        // Step 3: Fix any other CDK-specific issues
         cleanedSvg = cleanedSvg.replace(/xmlns:ns0=".*?"/g, '');
 
-        // Step 4: Make sure viewBox is properly set
         if (!cleanedSvg.includes('viewBox') && cleanedSvg.includes('width') && cleanedSvg.includes('height')) {
           const widthMatch = cleanedSvg.match(/width="(\d+\.?\d*)px?"/);
           const heightMatch = cleanedSvg.match(/height="(\d+\.?\d*)px?"/);
@@ -250,15 +309,15 @@ export default {
         return cleanedSvg;
       } catch (error) {
         console.error('Error sanitizing CDK SVG:', error);
-        return svgString; // Return original on error
+        return svgString;
       }
     },
-    copySmiles() {
-      if (!this.smilesList.length) return
+    copySmiles(index = 0) {
+      const structure = this.structures[index]
+      if (!structure || !structure.smiles) return
 
-      navigator.clipboard.writeText(joinValue(this.smiles))
+      navigator.clipboard.writeText(structure.smiles)
         .then(() => {
-          // Emit copied event
           this.$emit('copied', 'SMILES copied to clipboard')
         })
         .catch(err => {
@@ -266,12 +325,12 @@ export default {
           this.$emit('error', 'Failed to copy SMILES')
         })
     },
-    copyMolfile() {
-      if (!this.molfileList.length) return
+    copyMolfile(index = 0) {
+      const structure = this.structures[index]
+      if (!structure || !structure.molfile) return
 
-      navigator.clipboard.writeText(joinValue(this.molfile))
+      navigator.clipboard.writeText(structure.molfile)
         .then(() => {
-          // Emit copied event
           this.$emit('copied', 'Molfile copied to clipboard')
         })
         .catch(err => {
@@ -279,19 +338,17 @@ export default {
           this.$emit('error', 'Failed to copy Molfile')
         })
     },
-    downloadImage() {
-      if (!this.depictionData) return
+    downloadImage(index = 0) {
+      if (!this.depictions[index]) return
 
       try {
         let dataUrl = ''
 
         if (this.depictionFormat === 'svg') {
-          // Create a temporary SVG element with the sanitized SVG
           const svgElement = document.createElement('div')
-          svgElement.innerHTML = this.sanitizedSvg
+          svgElement.innerHTML = this.sanitizeCdkSvg(this.depictions[index])
           const svg = svgElement.firstChild
 
-          // Set needed attributes for SVG
           if (svg) {
             svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
             dataUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(new XMLSerializer().serializeToString(svg))
@@ -299,23 +356,20 @@ export default {
             throw new Error('Invalid SVG data')
           }
         } else if (this.depictionFormat === 'base64') {
-          dataUrl = 'data:image/png;base64,' + this.depictionData
+          dataUrl = 'data:image/png;base64,' + this.depictions[index]
         } else {
           throw new Error('Unsupported depiction format')
         }
 
-        // Create a download link
         const link = document.createElement('a')
-        link.download = `${this.name || 'structure'}.${this.depictionFormat === 'svg' ? 'svg' : 'png'}`
+        link.download = `${this.name || 'structure'}-${index + 1}.${this.depictionFormat === 'svg' ? 'svg' : 'png'}`
         link.href = dataUrl
 
-        // Trigger download
         document.body.appendChild(link)
         link.click()
         document.body.removeChild(link)
 
-        // Emit download complete event
-        this.$emit('download-complete', `Structure image downloaded`)
+        this.$emit('download-complete', 'Structure image downloaded')
       } catch (error) {
         console.error('Error downloading image:', error)
         this.$emit('error', 'Failed to download structure image')
@@ -340,197 +394,130 @@ export default {
     display: flex;
     flex-direction: column;
 
-    .structure-header {
+    .loading-bar {
       display: flex;
-      justify-content: space-between;
       align-items: center;
-      margin-bottom: 0.75rem;
+      gap: 0.5rem;
+      justify-content: center;
+      padding: 0.5rem;
+      color: var(--color-text-light);
+      font-size: 0.875rem;
 
-      .structure-name {
-        font-size: 0.9375rem;
-        margin: 0;
-        font-weight: 600;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+      .loading-icon {
+        color: var(--color-primary);
       }
 
-      .structure-actions {
+      .spin {
+        animation: spin 1s linear infinite;
+      }
+    }
+
+    .structures-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .structure-item {
+      display: flex;
+      flex-direction: column;
+
+      .structure-display {
+        position: relative;
+        background-color: var(--color-input-bg);
+        border-radius: var(--radius-md);
+        padding: 0.75rem;
+        min-height: 160px;
         display: flex;
         align-items: center;
-        gap: 0.5rem;
+        justify-content: center;
+        border: 1px solid var(--color-border);
+        overflow: hidden;
 
-        .btn-action {
-          background: none;
-          border: none;
-          color: var(--color-text-light);
-          cursor: pointer;
-          padding: 0.25rem;
-          border-radius: 4px;
+        .svg-container {
+          width: 100%;
+          height: 100%;
           display: flex;
           align-items: center;
           justify-content: center;
-          transition: all 0.2s ease;
 
-          &:hover {
-            color: var(--color-primary);
-            background-color: rgba(74, 77, 231, 0.1);
+          :deep(svg) {
+            max-width: 100%;
+            max-height: 260px;
           }
         }
-      }
-    }
 
-    .structure-display {
-      position: relative;
-      background-color: var(--color-input-bg);
-      border-radius: var(--radius-md);
-      padding: 0.75rem;
-      height: 300px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 0.75rem;
-      border: 1px solid var(--color-border);
-      overflow: hidden;
-
-      .loading-overlay {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        background-color: rgba(255, 255, 255, 0.9);
-        z-index: 5;
-        border-radius: var(--radius-md);
-
-        .loading-icon {
-          color: var(--color-primary);
-          margin-bottom: 0.5rem;
-        }
-
-        .spin {
-          animation: spin 1s linear infinite;
-        }
-
-        p {
-          font-size: 0.875rem;
-          color: var(--color-text);
-        }
-      }
-
-      .svg-container {
-        width: 100%;
-        height: 100%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-
-        :deep(svg) {
+        .structure-image {
           max-width: 100%;
-          max-height: 100%;
-        }
-      }
-
-      .structure-image {
-        max-width: 100%;
-        max-height: 100%;
-      }
-
-      .fallback-container {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        height: 100%;
-
-        .smiles-fallback {
-          font-family: monospace;
-          font-size: 0.875rem;
-          color: var(--color-text-light);
-          text-align: center;
-          max-width: 90%;
-          word-break: break-all;
-        }
-      }
-    }
-
-    .structure-details {
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-
-      .smiles-data {
-        display: flex;
-        align-items: baseline;
-        gap: 0.5rem;
-        font-size: 0.875rem;
-
-        .smiles-label {
-          font-weight: 500;
-          color: var(--color-text);
+          max-height: 260px;
         }
 
-        .smiles-value {
-          color: var(--color-text-light);
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-          font-family: monospace;
-        }
-      }
-
-      .structure-source {
-        display: flex;
-        flex-wrap: wrap;
-        /* Allow tags to wrap if needed */
-        gap: 0.75rem;
-
-        .source-tag,
-        .engine-tag {
+        .fallback-container {
           display: flex;
           align-items: center;
-          gap: 0.25rem;
-          font-size: 0.75rem;
-          border-radius: 4px;
-          padding: 0.25rem 0.5rem;
+          justify-content: center;
+          width: 100%;
 
-          .icon-source {
-            flex-shrink: 0;
+          .smiles-fallback {
+            font-family: monospace;
+            font-size: 0.875rem;
+            color: var(--color-text-light);
+            text-align: center;
+            max-width: 90%;
+            word-break: break-all;
           }
         }
+      }
 
-        .molfile-tag {
-          background-color: rgba(52, 199, 89, 0.1);
-          color: var(--color-success);
-          border: 1px solid rgba(52, 199, 89, 0.2);
-        }
+      .structure-item-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        padding: 0.25rem 0.25rem 0;
 
-        .smiles-tag {
+        .structure-index {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-width: 1.25rem;
+          height: 1.25rem;
+          padding: 0 0.375rem;
+          border-radius: 999px;
           background-color: rgba(74, 77, 231, 0.1);
           color: var(--color-primary);
-          border: 1px solid rgba(74, 77, 231, 0.2);
+          font-size: 0.75rem;
+          font-weight: 600;
         }
 
-        .engine-tag {
-          background-color: rgba(100, 100, 100, 0.1);
-          color: var(--color-text-light);
-          border: 1px solid rgba(100, 100, 100, 0.2);
-        }
+        .structure-actions {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
 
-        /* Added specific tags for each engine */
-        .decimer-tag {
-          background-color: rgba(255, 149, 0, 0.1);
-          color: #ff9500;
-          border: 1px solid rgba(255, 149, 0, 0.2);
-        }
+          .btn-action {
+            background: none;
+            border: none;
+            color: var(--color-text-light);
+            cursor: pointer;
+            padding: 0.25rem;
+            border-radius: 4px;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            font-size: 0.8125rem;
+            transition: all 0.2s ease;
 
-        .molparser-tag {
-          background-color: rgba(0, 122, 255, 0.1);
-          color: #007aff;
-          border: 1px solid rgba(0, 122, 255, 0.2);
+            &:hover {
+              color: var(--color-primary);
+              background-color: rgba(74, 77, 231, 0.1);
+            }
+
+            &.edit-btn {
+              border: 1px solid var(--color-border);
+              padding: 0.25rem 0.5rem;
+            }
+          }
         }
       }
     }

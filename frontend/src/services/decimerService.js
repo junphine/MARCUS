@@ -102,19 +102,20 @@ listSegmentFiles: async (directory) => {
       // Default values if parsing fails
       let pageNum = 0;
       let segmentIndex = 0;
-      
+      let uniqueId = filename;
       // Try to extract page number and segment index
       if (parts.length > 1 && parts[0] === 'page') {
         pageNum = parseInt(parts[1], 10) || 0;
         segmentIndex = parts.length > 2 ? parseInt(parts[2], 10) || 0 : 0;
+        // Create a unique ID that includes the page number
+        uniqueId = `page-${pageNum}-segment-${segmentIndex}`;
       }
-      if (parts.length > 2 && parts[0] === 'picture') {
+      else if (parts.length > 2 && parts[0] === 'picture') {
         // Override with filename info if available (more reliable)
         segmentIndex = parseInt(parts[1], 10);
+        // Create a unique ID that includes the page number
+        uniqueId = `page-${pageNum}-segment-${segmentIndex}`;
       }
-      
-      // Create a unique ID that includes the page number
-      const uniqueId = `page-${pageNum}-segment-${segmentIndex}`;
       
       // FIXED: Don't construct the URL manually - this is missing the /latest/ prefix in development
       // Instead, just store the path and let getApiImageUrl handle the proper URL construction
@@ -123,9 +124,8 @@ listSegmentFiles: async (directory) => {
         // Don't set imageUrl here - let the imageUrl helper handle this consistently
         path: `${directory}/images/${filename}`,
         filename: filename,
-        pageNumber: pageNum + 1, // 1-based page number for display
+        pageNumber: pageNum, // 1-based page number for display
         segmentNumber: segmentIndex,
-        pageIndex: pageNum // Store original 0-based page index
       };
     });
     

@@ -346,7 +346,7 @@ processSegments: async (segments, options = {}) => {
       }
       
       // Extract page and segment information from the segment
-      let pageNum = 0;
+      let pageNum = segment.pageNumber || 0;
       let segmentNum = 0;
       
       // Try to parse from ID 
@@ -357,12 +357,7 @@ processSegments: async (segments, options = {}) => {
           segmentNum = parseInt(pageMatch[2], 10);
         }
       }
-      
-      // Override with explicit properties if available
-      if (segment.pageIndex !== undefined) {
-        pageNum = segment.pageIndex;
-      }
-      
+
       if (segment.segmentNumber !== undefined) {
         segmentNum = segment.segmentNumber;
       }
@@ -406,8 +401,8 @@ processSegments: async (segments, options = {}) => {
           engine: options.engine,
           name: filename,
           pdfId: pdfId, // IMPORTANT: Store the PDF ID with each structure
-          pageIndex: pageNum,
-          segmentIndex: segmentNum,
+          pageNumber: pageNum,
+          segmentNumber: segmentNum,
           uniqueKey: `pdf-${pdfId}-page-${pageNum}-segment-${segmentNum}`,
           useCoordinates: useCoordinates,
           processingTime: new Date().toISOString()
@@ -423,8 +418,8 @@ processSegments: async (segments, options = {}) => {
           filename: filename,
           name: filename,
           pdfId: pdfId, // Store the PDF ID
-          pageIndex: pageNum,
-          segmentIndex: segmentNum,
+          pageNumber: pageNum,
+          segmentNumber: segmentNum,
           uniqueKey: `pdf-${pdfId}-page-${pageNum}-segment-${segmentNum}`,
           error: apiError.message || 'API processing failed',
           processingTime: new Date().toISOString()
@@ -436,7 +431,7 @@ processSegments: async (segments, options = {}) => {
       // Include failed segment in results with error information
       if (segment) {
         const filename = segment.filename || ocsrService.extractFilename(segment.path || segment.imageUrl);
-        const pageNum = segment.pageIndex || 0;
+        const pageNum = segment.pageNumber || 0;
         const segmentNum = segment.segmentNumber || 0;
         
         results.push({
@@ -445,8 +440,8 @@ processSegments: async (segments, options = {}) => {
           filename: filename,
           name: filename,
           pdfId: pdfId, // Store the PDF ID
-          pageIndex: pageNum,
-          segmentIndex: segmentNum,
+          pageNumber: pageNum,
+          segmentNumber: segmentNum,
           uniqueKey: `pdf-${pdfId}-page-${pageNum}-segment-${segmentNum}`,
           error: error.message || 'Processing failed',
           processingTime: new Date().toISOString()

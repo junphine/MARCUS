@@ -236,7 +236,7 @@ export default {
       return [...this.visibleSegments].sort((a, b) => {
         // Extract page and segment numbers
         const getPageAndSegment = (segment) => {
-          let pageNum = 0;
+          let pageNum = segment.pageNumber || 0;
           let segmentNum = 0;
           
           // Try to parse from ID first
@@ -424,7 +424,7 @@ export default {
       if (!segment) return null
 
       // Extract page and segment information
-      let pageNum = 0;
+      let pageNum = segment.pageNumber || 0;
       let segmentNum = 0;
 
       // Try to parse from ID or filename
@@ -465,17 +465,17 @@ export default {
       }
 
       // 3. Try to match by page and segment index explicitly
-      if (segment.pageIndex !== undefined && segment.segmentNumber !== undefined) {
+      if (segment.pageNumber !== undefined && segment.segmentNumber !== undefined) {
         structure = this.convertedStructures.find(s =>
-          s.pageIndex === segment.pageIndex && s.segmentIndex === segment.segmentNumber
+          s.pageNumber === segment.pageNumber && s.segmentIndex === segment.segmentNumber
         );
         if (structure) return structure;
       }
 
       // 4. Try to match extracted page and segment numbers
       structure = this.convertedStructures.find(s =>
-        (s.pageIndex === pageNum || s.pageIndex === segment.pageIndex) &&
-        (s.segmentIndex === segmentNum || s.segmentIndex === segment.segmentNumber)
+        (s.pageNumber === pageNum || s.pageIndex === segment.pageIndex) &&
+        (s.segmentNumber === segmentNum || s.segmentNumber === segment.segmentNumber)
       );
       if (structure) return structure;
 

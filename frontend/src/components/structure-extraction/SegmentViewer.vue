@@ -136,14 +136,6 @@
                 </div>
               </div>
             </div>
-
-            <!-- Enhanced Edit Structure button -->
-            <div v-if="displayedStructure" class="action-footer">
-              <button class="edit-structure-btn" @click="showStructureEditor = true">
-                <vue-feather type="edit-3" size="16" class="btn-icon" />
-                <span>Edit Structure</span>
-              </button>
-            </div>
           </div>
 
           <div v-if="displayedStructure" class="panel structure-panel">
@@ -166,7 +158,9 @@
                   :smiles="displayedStructure.smiles" :molfile="displayedStructure.molfile"
                   :name="displayedStructure.name || `Compound ${segmentNumber}`"
                   :source-engine="displayedStructure.engine" :use-coordinates="shouldUseCoordinates"
+                  :editable="true"
                   @copied="handleCopied" @error="handleStructureError" @download-complete="handleDownloadComplete"
+                  @structure-edited="onStructureEditApply"
                   hide-controls />
               </div>
             </div>
@@ -534,10 +528,6 @@
     <ComparisonModal v-if="showComparisonModal" :comparison-result="comparisonResult" :is-loading="isComparing"
       :error="comparisonError" :smiles-list="smilesListForComparison" @close="closeComparisonModal" />
 
-    <!-- Structure Editor Modal -->
-    <KetcherEditorModal :visible="showStructureEditor" :initialSmiles="displayedStructure?.smiles"
-      :initialMolfile="editableMolfile" @close="showStructureEditor = false"
-      @apply="onStructureEditApply" @error="handleStructureError" />
   </div>
 </template>
 
@@ -545,7 +535,6 @@
 import ImprovedChemicalStructureViewer from './ImprovedChemicalStructureViewer.vue'
 import ComparisonModal from './ComparisonModal.vue'
 import SimilarityComparison from './SimilarityComparison.vue'
-import KetcherEditorModal from './KetcherEditorModal.vue'
 import ocsrService from '@/services/ocsrService'
 import depictionService from '@/services/depictionService'
 import similarityService from '@/services/similarityService'
@@ -559,8 +548,7 @@ export default {
   components: {
     ImprovedChemicalStructureViewer,
     ComparisonModal,
-    SimilarityComparison,
-    KetcherEditorModal
+    SimilarityComparison
   },
   props: {
     segment: {
@@ -614,8 +602,6 @@ export default {
       selectedEngine: null, // Will store 'molecode' or 'molparser'
       // New property to enable/disable auto analysis
       autoAnalysisEnabled: true,
-      // Structure editor modal state
-      showStructureEditor: false,
       // New properties for structure updating fix
       currentStructure: null,
       forceUpdateKey: Date.now(),
@@ -641,14 +627,6 @@ export default {
     },
     displayedSmiles() {
       return joinValue(this.displayedStructure?.smiles);
-    },
-    editableMolfile() {
-      // MoleCode's "molfile" is actually a mermaid graph, not a real molfile,
-      // so Ketcher cannot parse it - only pass real molfiles to the editor
-      if (!this.displayedStructure || this.displayedStructure.engine === 'molecode') {
-        return '';
-      }
-      return primary(this.displayedStructure.molfile);
     },
     hasStructure() {
       return !!this.displayedStructure;
@@ -1593,27 +1571,27 @@ export default {
       this.comparisonMode = false;
     },
 
-    // FIXED: Improved onStructureEditApply method to properly update UI and ensure changes persist
+    // Handle the structure-edited event emitted by ImprovedChemicalStructureViewer.
+    // payload: { index, smiles: string[], molfile: string[] }
     onStructureEditApply(payload) {
-      // payload: { smiles: '...', molfile?: '...' }
-      if (!payload || !payload.smiles) {
+      if (!payload || !payload.smiles || !payload.smiles.length) {
         this.$emit('error', 'No structure returned from editor');
-        this.showStructureEditor = false;
         return;
       }
 
-      // Create updated structure object
       if (!this.processedStructure) {
         this.$emit('error', 'Cannot update: no base structure available');
-        this.showStructureEditor = false;
         return;
       }
 
-      // Update local state immediately to reflect changes in the UI
+      // Update local state immediately to reflect changes in the UI.
+      // smiles/molfile are now lists (one entry per detected structure).
       const updatedStructure = {
         ...this.processedStructure,
-        smiles: payload.smiles,
-        molfile: payload.molfile || this.processedStructure.molfile,
+        smiles: Array.isArray(payload.smiles) ? payload.smiles : [payload.smiles],
+        molfile: (Array.isArray(payload.molfile) && payload.molfile.length)
+          ? payload.molfile
+          : this.processedStructure.molfile,
         engine: 'manual-edit',
         timestamp: new Date().toISOString(),
         name: this.processedStructure.name || `Edited Compound ${this.segmentNumber}`,
@@ -1639,7 +1617,6 @@ export default {
         this.$emit('toggle-selection');
       }
 
-      this.showStructureEditor = false;
       this.$emit('notification', {
         type: 'success',
         message: 'Structure updated from editor'
