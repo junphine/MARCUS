@@ -67,7 +67,7 @@ def extract_mermaid(text: str) -> str:
 
 
 
-def extract_smiles(image_path:str,expected_smiles = None) -> Dict[str, Any]:
+def extract_smiles(image_path:str, expected_smiles = None) -> Dict[str, Any]:
     path = Path(image_path)
     if not path.exists():
         raise FileNotFoundError(f"Image file not found: {path}")
@@ -89,14 +89,13 @@ def extract_smiles(image_path:str,expected_smiles = None) -> Dict[str, Any]:
         return None
 
     print(f"Calling vision model '{client.model}' for OCSR ...")
-    reply = client.chat(USER_INSTRUCTION, system=MOLECULE_SYSTEM_PROMPT,
-                        images=[image_path])
+    reply = client.chat(USER_INSTRUCTION, system=MOLECULE_SYSTEM_PROMPT, images=[image_path])
 
     # 3. extract + validate the MoleCode graph.
     graph = extract_mermaid(reply)
     print("\nPredicted MoleCode graph:\n")
     print(graph)
-    result = dict(graph=graph,image_name=image_name)
+    result = dict(graph=graph,image_name=image_name,smiles=[])
     mol = mermaid_to_mol(graph, strict=False)
     if mol is None:
         print("\nCould not parse the predicted graph.")
@@ -107,7 +106,7 @@ def extract_smiles(image_path:str,expected_smiles = None) -> Dict[str, Any]:
     print("\nRecovered SMILES:", recovered,
           "(contains abbreviation placeholders)" if has_invalid_atoms(mol) else "")
 
-    result['smiles'] = recovered
+    result['smiles'] = [recovered]
 
     # 4. compare against ground truth when we rendered a known molecule.
     if expected_smiles is not None:
@@ -160,7 +159,7 @@ def extract_markush_smiles(image_path:str,expected_smiles = None) -> Dict[str, A
     print("\nRecovered SMILES:", recovered,
           "(contains abbreviation placeholders)" if has_invalid_atoms(mol) else "")
 
-    result['smiles'] = recovered
+    result['smiles'] = [recovered]
 
     # 4. compare against ground truth when we rendered a known molecule.
     if expected_smiles is not None:

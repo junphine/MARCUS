@@ -1,4 +1,5 @@
 import api from './api'
+import { primary } from '@/utils/structure'
 
 /**
  * Service for interacting with the molecular depiction endpoints
@@ -39,6 +40,11 @@ const depictionService = {
       }
       
       const requestData = { ...defaults, ...options }
+
+      // The OCSR endpoints return smiles/molfile as arrays; the depiction
+      // endpoint expects a single string, so use the primary structure.
+      if (requestData.smiles != null) requestData.smiles = primary(requestData.smiles)
+      if (requestData.molfile != null) requestData.molfile = primary(requestData.molfile)
 
       // The engine can be overridden by the caller (e.g. 'mermaid' for
       // MoleCode results); it defaults to 'cdk' when not specified.
@@ -93,7 +99,7 @@ const depictionService = {
       }
       
       const requestData = {
-        smiles: smiles,
+        smiles: primary(smiles),
         outputFormat: 'molfile'
       };
       
@@ -121,12 +127,12 @@ const depictionService = {
       
       // Add SMILES if provided
       if (options.smiles) {
-        formData.append('smiles', options.smiles)
+        formData.append('smiles', primary(options.smiles))
       }
       
       // Add molfile if provided and useMolfile is true
       if (options.molfile && (options.useMolfile !== false)) {
-        formData.append('molfile', options.molfile)
+        formData.append('molfile', primary(options.molfile))
         // Use camelCase version which the backend expects
         formData.append('useMolfileDirectly', 'true')
         console.log('Using molfile coordinates for OCSR depiction');

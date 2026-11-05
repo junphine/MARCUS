@@ -391,7 +391,9 @@ processSegments: async (segments, options = {}) => {
         });
 
         console.log(`[${batchId}] Got response for ${segment.id} - ${filename}:`,
-          response.smiles ? `SMILES found (${response.smiles.length} chars)` : 'No SMILES');
+          (Array.isArray(response.smiles) ? response.smiles.length : (response.smiles ? 1 : 0)) > 0
+            ? `SMILES found (${Array.isArray(response.smiles) ? response.smiles.length : 1} structures)`
+            : 'No SMILES');
 
         // Create structure object with the correct segmentId AND PDF ID
         const structure = {

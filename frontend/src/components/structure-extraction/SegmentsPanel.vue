@@ -605,7 +605,9 @@ export default {
         console.log(`[${processId}] Calling OCSR service with options:`, options)
         const result = await ocsrService.generateBoth(null, imagePath, options)
         console.log(`[${processId}] Got OCSR result:`,
-          result.smiles ? `SMILES found (${result.smiles.length} chars)` : 'No SMILES')
+          (Array.isArray(result.smiles) ? result.smiles.length : (result.smiles ? 1 : 0)) > 0
+            ? `SMILES found (${Array.isArray(result.smiles) ? result.smiles.length : 1} structures)`
+            : 'No SMILES')
 
         // Ensure segment has the correct pdfId
         const pdfId = segment.pdfId || this.effectivePdfId

@@ -367,7 +367,7 @@ def extract_picture_segments_from_pdf(
                 segment_metadata = {
                     "segment_id": f"picture-{picture_counter}",
                     "filename": segment_filename,
-                    "path": os.path.join("images", segment_filename),
+                    "path": "images/"+segment_filename,
                     "pageNumber": page_number,
                     "segmentNumber": picture_counter,
                     "bbox": bbox,
@@ -499,7 +499,7 @@ def generate_basic_metadata(
                     segment_metadata = {
                         "segment_id": segment_id,
                         "filename": segment_file,
-                        "path": os.path.join("images", segment_file),
+                        "path": "images/"+segment_file,
                         "pageNumber": 0,
                         "segmentNumber": idx + 1,
                         "bbox": [0, 0, 1000, 1000],

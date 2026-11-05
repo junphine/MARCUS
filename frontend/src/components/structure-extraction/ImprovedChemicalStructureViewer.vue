@@ -1,6 +1,6 @@
 <template>
   <div class="chemical-structure-viewer">
-    <div v-if="!smiles && !molfile" class="empty-state">
+    <div v-if="!smilesList.length && !molfileList.length" class="empty-state">
       <p>No structure data available</p>
     </div>
 
@@ -31,16 +31,17 @@
 
 <script>
 import depictionService from '@/services/depictionService'
+import { primary, joinValue, toList } from '@/utils/structure'
 
 export default {
   name: 'ImprovedChemicalStructureViewer',
   props: {
     smiles: {
-      type: String,
+      type: [String, Array],
       default: ''
     },
     molfile: {
-      type: String,
+      type: [String, Array],
       default: ''
     },
     name: {
@@ -74,16 +75,23 @@ export default {
     }
   },
   computed: {
+    smilesList() {
+      return toList(this.smiles)
+    },
+    molfileList() {
+      return toList(this.molfile)
+    },
     truncatedSmiles() {
-      if (!this.smiles) return ''
-      return this.smiles.length > 30 ? this.smiles.substring(0, 27) + '...' : this.smiles
+      const value = joinValue(this.smiles, '\n')
+      if (!value) return ''
+      return value.length > 30 ? value.substring(0, 27) + '...' : value
     },
     shouldUseMolfile() {
       // Use molfile if available AND either:
       // 1. useCoordinates prop is true (explicit request to use coordinates)
       // 2. The source is molecode (its molfile is a mermaid graph rendered by merman)
       // 3. The source is molparser AND there's no explicit request not to use coordinates
-      return !!this.molfile &&
+      return this.molfileList.length > 0 &&
         (this.useCoordinates === true ||
           this.sourceEngine === 'molecode' ||
           (this.sourceEngine === 'molparser' &&
@@ -132,7 +140,7 @@ export default {
   },
   methods: {
     async generateDepiction() {
-      if (!this.smiles && !this.molfile) return
+      if (!this.smilesList.length && !this.molfileList.length) return
 
       // Set loading state and initialize flag
       this.isLoading = true
@@ -143,7 +151,7 @@ export default {
         if (!this.initialized) {
           console.log(`[Depiction] Starting initial depiction for ${this.name || 'unknown structure'} with engine ${this.sourceEngine}`);
           console.log(`[Depiction] UseCoordinates setting: ${this.useCoordinates}`);
-          console.log(`[Depiction] Has molfile: ${!!this.molfile}`);
+          console.log(`[Depiction] Has molfile: ${this.molfileList.length > 0}`);
         }
 
         // Determine whether to use the molfile for depiction
@@ -165,16 +173,16 @@ export default {
         }
 
         // Include SMILES when available
-        if (this.smiles) {
-          options.smiles = this.smiles
+        if (this.smilesList.length) {
+          options.smiles = primary(this.smiles)
         }
 
         // Always include the molfile when available: mermaid renders the
         // MoleCode graph directly, and CDK uses the molfile coordinates
         // when use_molfile_directly is set
-        if (this.molfile) {
+        if (this.molfileList.length) {
           console.log(`[Depiction] Including molfile for ${this.name || 'structure'} (${this.sourceEngine})`);
-          options.molfile = this.molfile
+          options.molfile = primary(this.molfile)
           // snake_case so the backend pydantic model picks it up
           options.use_molfile_directly = this.usingMolfile
         }
@@ -246,9 +254,9 @@ export default {
       }
     },
     copySmiles() {
-      if (!this.smiles) return
+      if (!this.smilesList.length) return
 
-      navigator.clipboard.writeText(this.smiles)
+      navigator.clipboard.writeText(joinValue(this.smiles))
         .then(() => {
           // Emit copied event
           this.$emit('copied', 'SMILES copied to clipboard')
@@ -259,9 +267,9 @@ export default {
         })
     },
     copyMolfile() {
-      if (!this.molfile) return
+      if (!this.molfileList.length) return
 
-      navigator.clipboard.writeText(this.molfile)
+      navigator.clipboard.writeText(joinValue(this.molfile))
         .then(() => {
           // Emit copied event
           this.$emit('copied', 'Molfile copied to clipboard')

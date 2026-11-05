@@ -1,5 +1,6 @@
 // filepath: /Volumes/Data_Drive/Project/2025/Project_marcus/Project_MARCUS/frontend/src/services/coconutService.js
 import axios from 'axios';
+import { primary } from '@/utils/structure';
 
 // Create a dedicated axios instance for COCONUT API
 const coconutApi = axios.create({
@@ -130,7 +131,7 @@ export default {
             comment: submissionData.comment,
             suggested_changes: {
               new_molecule_data: {
-                canonical_smiles: submissionData.structureData.smiles,
+                canonical_smiles: primary(submissionData.structureData.smiles),
                 reference_id: submissionData.referenceId || '',
                 name: submissionData.name,
                 link: submissionData.link || '',

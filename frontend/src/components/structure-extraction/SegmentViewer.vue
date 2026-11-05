@@ -176,7 +176,7 @@
                 <span class="smiles-label">SMILES:</span>
               </div>
               <div class="smiles-content">
-                <div class="smiles-box">{{ displayedStructure.smiles }}</div>
+                <div class="smiles-box">{{ displayedSmiles }}</div>
               </div>
             </div>
 
@@ -552,6 +552,7 @@ import similarityService from '@/services/similarityService'
 import { getApiImageUrl } from '@/services/api'
 import eventBus from '@/utils/eventBus';
 import { copyTextToClipboard } from '@/utils/clipboard';
+import { primary, joinValue } from '@/utils/structure';
 
 export default {
   name: 'SegmentViewer',
@@ -638,13 +639,16 @@ export default {
       // Use the local edited structure if available, otherwise use the prop
       return this.currentStructure || this.processedStructure || null;
     },
+    displayedSmiles() {
+      return joinValue(this.displayedStructure?.smiles);
+    },
     editableMolfile() {
       // MoleCode's "molfile" is actually a mermaid graph, not a real molfile,
       // so Ketcher cannot parse it - only pass real molfiles to the editor
       if (!this.displayedStructure || this.displayedStructure.engine === 'molecode') {
         return '';
       }
-      return this.displayedStructure.molfile || '';
+      return primary(this.displayedStructure.molfile);
     },
     hasStructure() {
       return !!this.displayedStructure;
@@ -790,8 +794,8 @@ export default {
 
       // Get valid SMILES strings
       const validSmiles = [];
-      if (this.decimerResult?.smiles) validSmiles.push({ engine: 'molecode', smiles: this.decimerResult.smiles });
-      if (this.molparserResult?.smiles) validSmiles.push({ engine: 'molparser', smiles: this.molparserResult.smiles });
+      if (this.decimerResult?.smiles) validSmiles.push({ engine: 'molecode', smiles: primary(this.decimerResult.smiles) });
+      if (this.molparserResult?.smiles) validSmiles.push({ engine: 'molparser', smiles: primary(this.molparserResult.smiles) });
 
       // Need at least 2 engines with SMILES to compare
       if (validSmiles.length < 2) return;
@@ -872,7 +876,7 @@ export default {
     copyEngineSmiles(smiles) {
       if (!smiles) return;
 
-      copyTextToClipboard(smiles)
+      copyTextToClipboard(joinValue(smiles))
         .then(() => {
           this.$emit('copy-complete', 'SMILES copied to clipboard');
         })
@@ -1015,8 +1019,9 @@ export default {
     },
 
     truncateText(text, maxLength) {
-      if (!text) return '';
-      return text.length > maxLength ? text.substring(0, maxLength - 3) + '...' : text;
+      const value = joinValue(text)
+      if (!value) return ''
+      return value.length > maxLength ? value.substring(0, maxLength - 3) + '...' : value
     },
 
     runComparison() {
@@ -1206,7 +1211,7 @@ export default {
     copySmilesToClipboard() {
       if (!this.displayedStructure || !this.displayedStructure.smiles) return;
 
-      copyTextToClipboard(this.displayedStructure.smiles)
+      copyTextToClipboard(joinValue(this.displayedStructure.smiles))
         .then(() => {
           // Show success message
           this.$emit('copy-complete', 'SMILES copied to clipboard');
@@ -1321,12 +1326,12 @@ export default {
 
         // Collect SMILES from each engine
         if (this.decimerResult && this.decimerResult.smiles) {
-          smilesList.push(this.decimerResult.smiles);
+          smilesList.push(primary(this.decimerResult.smiles));
           engineNames.push(engines[0]); // molecode
         }
 
         if (this.molparserResult && this.molparserResult.smiles) {
-          smilesList.push(this.molparserResult.smiles);
+          smilesList.push(primary(this.molparserResult.smiles));
           engineNames.push(engines[1]); // molparser
         }
 
@@ -1413,12 +1418,12 @@ export default {
           try {
             if (result.molfile) {
               // If molfile exists, use it
-              molfiles.push(result.molfile);
+              molfiles.push(primary(result.molfile));
               engineNames.push(result.engine);
             } else if (result.smiles) {
               // If only SMILES exists, convert to molfile
               console.log(`Converting SMILES to molfile for ${result.engine}`);
-              const depictionResponse = await depictionService.generateMolfileFromSmiles(result.smiles);
+              const depictionResponse = await depictionService.generateMolfileFromSmiles(primary(result.smiles));
 
               if (depictionResponse && depictionResponse.molfile) {
                 molfiles.push(depictionResponse.molfile);

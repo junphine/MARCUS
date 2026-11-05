@@ -21,6 +21,22 @@ image_mime_mapping = {
     ".ico": "image/x-icon",
 }
 
+# ---------------------------------------------------------------------------
+# 超长 Markdown 处理参数
+# ---------------------------------------------------------------------------
+# 文件超过该大小（字节）时，改用「大纲导航 + 按需读取」策略，避免一次性塞入上下文
+LARGE_MD_SIZE_THRESHOLD = 1_000_000
+# 单个章节内容超过该字符数时，进一步按段落切块
+MAX_SECTION_CHARS = 20_000
+# 单轮读取的章节内容字符预算（防止单次请求上下文过大）
+MAX_SECTION_CHARS_PER_ROUND = 40_000
+# 大纲导航最多迭代轮数（防止模型反复请求陷入死循环）
+MAX_OUTLINE_ROUNDS = 6
+
+# 匹配 Markdown 标题行：`# 标题` ~ `###### 标题`
+_HEADING_RE = re.compile(r'^(#{1,6})\s+(.+?)\s*#*\s*$')
+
+
 def is_image_by_ext(file_path: Path):
     ext = file_path.suffix.lower()
     return ext in image_mime_mapping
@@ -52,7 +68,7 @@ class QwenPawRemoteClient:
             password: 密码（如果需要认证）
             file_extensions: 要处理的文件扩展名列表（如 ['.md', '.txt', '.png']），None 表示处理所有文件
         """
-        self.base_url = base_url or "http://localhost:8088"
+        self.base_url = base_url or os.environ.get("QWENPAW_BASE_URL","http://localhost:8088")
         self.api_url = f"{self.base_url}/api/console/chat"
         self.login_url = f"{self.base_url}/api/auth/login"
         self.agent_id = agent_id
@@ -178,40 +194,35 @@ class QwenPawRemoteClient:
             print(f"  x 读取文件失败：{e}")
             return ""
 
-    def prompt(self,
-            content: List[Dict],
+    def _post_chat(self,
+            messages: List[Dict],
             workspace: str | None = None,
-            system_prompt: List[Dict] | None = None,
             session_id: str = None
     ) -> Dict:
         """
-        基于内容生成输出
+        发送完整的对话消息列表（每条消息含 role 与 content 块）并流式返回结果。
+
+        与 prompt() 的区别：messages 可为多轮对话（system/user/assistant 交替），
+        用于「大纲导航 + 按需读取」这类需要多轮交互的场景。
 
         Args:
-            content: 文件内容
+            messages: 消息列表，每项形如 {"role": "...", "content": [块, ...]}
             workspace: 工作路径
-            system_prompt： 系统提示词
-            session_id： 会话id
+            session_id: 会话 id
         Returns:
-            Dict: 包含生成结果
+            Dict: 包含生成结果（content/success/error）
         """
-        # 构建请请求
         headers = {
             "Content-Type": "application/json",
             "X-Agent-Id": self.agent_id
         }
-
         if self.auth_token:
             headers["Authorization"] = f"Bearer {self.auth_token}"
-        intput = []
-        if system_prompt:
-            intput.append({"role":"system","content":system_prompt})
-        intput.append({"role": "user", "content": content})
 
         data = {
-            "input": intput,
+            "input": messages,
             "session_id": session_id,
-            "user_id": self.username or "molecode",
+            "user_id": self.username or "guest",
             "channel": "console",
             "request_context": {
                 "session_project_dir": workspace
@@ -225,7 +236,7 @@ class QwenPawRemoteClient:
         }
 
         try:
-            with requests.post(self.api_url,headers=headers,json=data,timeout=600) as response:
+            with requests.post(self.api_url, headers=headers, json=data, timeout=600) as response:
                 if response.status_code != 200:
                     result["error"] = f"HTTP {response.status_code}: {response.text}"
                     return result
@@ -263,6 +274,30 @@ class QwenPawRemoteClient:
             print(f"\n x 请求异常：{e}")
 
         return result
+
+    def prompt(self,
+            content: List[Dict],
+            workspace: str | None = None,
+            system_prompt: List[Dict] | None = None,
+            session_id: str = None
+    ) -> Dict:
+        """
+        基于内容生成输出
+
+        Args:
+            content: 文件内容
+            workspace: 工作路径
+            system_prompt： 系统提示词
+            session_id： 会话id
+        Returns:
+            Dict: 包含生成结果
+        """
+        intput = []
+        if system_prompt:
+            intput.append({"role": "system", "content": system_prompt})
+        intput.append({"role": "user", "content": content})
+
+        return self._post_chat(intput, workspace=workspace, session_id=session_id)
 
     def process_directory(
             self,
@@ -352,7 +387,7 @@ class QwenPawRemoteClient:
                     prompt.append({"type":"text","text":content})
                 else:
                     image_data = file_path.read_bytes()
-                    mime = guess_image_mime(image_path)
+                    mime = guess_image_mime(file_path)
                     b64 = base64.b64encode(image_data).decode("utf-8")
                     prompt.append({"type": "image", "image_url": f"data:{mime};base64,{b64}"})
 
@@ -489,6 +524,357 @@ class QwenPawRemoteClient:
 
         return blocks
 
+    # -----------------------------------------------------------------------
+    # 超长 Markdown：大纲导航 + 按需读取
+    # -----------------------------------------------------------------------
+    def _extract_outline(self, markdown_content: str):
+        """
+        解析 Markdown 标题层级，生成大纲与章节映射。
+
+        Args:
+            markdown_content: Markdown 全文
+
+        Returns:
+            (outline_lines, sections, preamble)
+            outline_lines: 供模型阅读的大纲行（含编号、标题、字符数）
+            sections: {"1.2": {"level":2,"title":"...","content":"..."}, ...}
+            preamble: 第一个标题之前的正文前内容（如摘要、前言）
+        """
+        lines = markdown_content.splitlines()
+        raw_headings = []  # (level, title, line_index)
+        for i, line in enumerate(lines):
+            m = _HEADING_RE.match(line)
+            if m:
+                raw_headings.append((len(m.group(1)), m.group(2).strip(), i))
+
+        # 无任何标题：返回空大纲，交由调用方退化处理
+        if not raw_headings:
+            return [], {}, markdown_content
+
+        # 仅有一个标题（无实质结构）：退化处理
+        if len(raw_headings) == 1:
+            return [], {}, markdown_content
+
+        # 常见论文结构：`# 标题`（唯一顶层标题）+ `## 章节`。
+        # 此时把标题及其后的正文前内容（如摘要）并入 preamble，避免标题章节吞噬全文。
+        min_level = min(h[0] for h in raw_headings)
+        min_level_count = sum(1 for h in raw_headings if h[0] == min_level)
+        title_only = (
+            min_level_count == 1
+            and raw_headings[0][0] == min_level
+            and len(raw_headings) > 1
+        )
+
+        if title_only:
+            body_headings = raw_headings[1:]
+            preamble = "\n".join(lines[: body_headings[0][2]])
+            min_level = min(h[0] for h in body_headings)
+        else:
+            body_headings = raw_headings
+            preamble = "\n".join(lines[: raw_headings[0][2]])
+
+        # 以最浅层级作为顶层，重新归一化层级编号
+        counts = [0] * 7
+        metas = []  # (sid, norm_level, start_line, title)
+        for level, title, start_line in body_headings:
+            norm_level = level - min_level + 1
+            counts[norm_level] += 1
+            for l in range(norm_level + 1, 7):
+                counts[l] = 0
+            sid = ".".join(str(counts[l]) for l in range(1, norm_level + 1))
+            metas.append((sid, norm_level, start_line, title))
+
+        # 每个章节的结束行 = 下一个「层级 <= 自身层级」的标题行（或文件末尾），
+        # 这样父章节会包含其所有子章节内容，避免跨章逻辑被切断。
+        sections = {}
+        total_lines = len(lines)
+        for idx, (sid, level, start_line, title) in enumerate(metas):
+            end_line = total_lines
+            for _sid2, level2, start_line2, _title2 in metas[idx + 1:]:
+                if level2 <= level:
+                    end_line = start_line2
+                    break
+            content = "\n".join(lines[start_line:end_line])
+            sections[sid] = {
+                "level": level,
+                "title": title,
+                "content": content,
+                "start_line": start_line,
+                "end_line": end_line,
+            }
+
+        outline_lines = []
+        if preamble.strip():
+            outline_lines.append(f"[0] （正文前内容） {len(preamble)} 字符")
+        for sid, level, _start_line, title in metas:
+            indent = "  " * (level - 1)
+            outline_lines.append(f"{indent}[{sid}] {title}（{len(sections[sid]['content'])} 字符）")
+
+        return outline_lines, sections, preamble
+
+    def _split_section_content(self, label: str, content: str, max_chars: int = MAX_SECTION_CHARS):
+        """
+        将一段内容按段落切块，使每块不超过 max_chars。
+
+        Returns:
+            List[(label, text)]: 若无需切块返回单元素；否则返回带「第 x/n 段」标注的块。
+        """
+        if len(content) <= max_chars:
+            return [(label, content)]
+
+        paragraphs = re.split(r'\n\s*\n', content)
+        pieces = []
+        current = ""
+        for p in paragraphs:
+            if current and len(current) + len(p) + 2 <= max_chars:
+                current += "\n\n" + p
+            elif not current and len(p) <= max_chars:
+                current = p
+            else:
+                if current:
+                    pieces.append(current)
+                    current = ""
+                # 单个段落超过上限时硬切
+                while len(p) > max_chars:
+                    pieces.append(p[:max_chars])
+                    p = p[max_chars:]
+                current = p
+        if current:
+            pieces.append(current)
+
+        if len(pieces) <= 1:
+            return [(label, content)]
+        return [(f"{label}（第 {i + 1}/{len(pieces)} 段）", piece) for i, piece in enumerate(pieces)]
+
+    def _parse_navigation_response(self, text: str):
+        """
+        解析模型在大纲导航阶段的回复。
+
+        Returns:
+            (action, sections, answer)
+            action: "read" 表示需要读取章节，"done" 表示已给出最终答案
+            sections: 需要读取的章节编号列表（action == "read" 时有效）
+            answer: 最终答案（action == "done" 时有效）
+        """
+        # READ 指令：READ: 1.2,3,0
+        read_match = re.search(r'^\s*READ\s*[:：]\s*(.+)$', text, re.IGNORECASE | re.MULTILINE)
+        if read_match:
+            ids = re.findall(r'[0-9]+(?:\.[0-9]+)*', read_match.group(1))
+            if ids:
+                return "read", ids, None
+
+        # DONE 指令：单独一行 DONE，其后为最终回答
+        done_match = re.search(r'^\s*DONE\s*[:：]?\s*$', text, re.IGNORECASE | re.MULTILINE)
+        if done_match:
+            answer = text[done_match.end():].strip()
+            if not answer:
+                answer = text.strip()
+            return "done", [], answer
+
+        # 未识别到指令：视为最终回答
+        return "done", [], text.strip()
+
+    def _build_section_payload(self, sections, preamble, requested_ids, sent_sections, base_dir: Path):
+        """
+        根据章节编号读取内容，转换为可发送的块列表，并记录已发送章节。
+
+        Returns:
+            List[Dict]: text/image 块列表
+        """
+        blocks = []
+        for sid in requested_ids:
+            if sid in sent_sections:
+                continue
+            sent_sections.add(sid)
+
+            if sid == "0":
+                content = preamble
+                title = "正文前内容"
+            elif sid in sections:
+                content = sections[sid]["content"]
+                title = sections[sid]["title"]
+            else:
+                blocks.append({"type": "text", "text": f"[{sid}] 章节不存在，已跳过。\n"})
+                continue
+
+            pieces = self._split_section_content(sid, content)
+            for label, piece_text in pieces:
+                blocks.append({"type": "text", "text": f"\n===== [{label}] {title} =====\n"})
+                blocks.extend(self._parse_markdown_blocks(piece_text, base_dir))
+        return blocks
+
+    def _ask_large_markdown_chunked(self, md_file: Path, question, system_prompt, session_id: str, markdown_content: str) -> Dict:
+        """
+        无标题结构的超长 Markdown 退化方案：按固定大小切块，分轮发送后再汇总作答。
+        """
+        chunks = self._split_section_content("document", markdown_content)
+        print(f"  文档无标题结构，退化为顺序切块（{len(chunks)} 块）")
+
+        conversation = []
+        if system_prompt:
+            conversation.append({"role": "system", "content": system_prompt})
+        conversation.append({
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "以下是一个超长文档，已按顺序切块。请逐段阅读，全部读完后我会请你作答。\n<question>\n"},
+                *question,
+                {"type": "text", "text": "\n</question>"},
+            ],
+        })
+
+        # 按轮次批量发送，每轮不超过字符预算，减少请求次数
+        rounds = []
+        cur_blocks = []
+        cur_chars = 0
+        for i, (_label, text) in enumerate(chunks, 1):
+            piece_blocks = self._parse_markdown_blocks(text, md_file.parent)
+            if cur_chars + len(text) > MAX_SECTION_CHARS_PER_ROUND and cur_blocks:
+                rounds.append(cur_blocks)
+                cur_blocks = []
+                cur_chars = 0
+            cur_blocks.append({"type": "text", "text": f"\n--- 文档第 {i}/{len(chunks)} 段 ---\n"})
+            cur_blocks.extend(piece_blocks)
+            cur_chars += len(text)
+        if cur_blocks:
+            rounds.append(cur_blocks)
+
+        result = None
+        for ri, round_blocks in enumerate(rounds, 1):
+            conversation.append({"role": "user", "content": round_blocks})
+            result = self._post_chat(conversation, workspace=str(md_file.parent), session_id=session_id)
+            if not result["success"]:
+                result["file"] = str(md_file)
+                return result
+            print(f"  已发送第 {ri}/{len(rounds)} 批")
+
+        # 全部读取完毕后请求最终答案
+        conversation.append({
+            "role": "user",
+            "content": [{"type": "text", "text": "以上为文档全文，请基于全文给出完整、准确的最终答案。"}],
+        })
+        result = self._post_chat(conversation, workspace=str(md_file.parent), session_id=session_id)
+        result["file"] = str(md_file)
+        return result
+
+    def _ask_large_markdown(self, md_file: Path, question: List[Dict], system_prompt: List[Dict], session_id: str = "") -> Dict:
+        """
+        对超过阈值的超长 Markdown 采用「大纲导航 + 按需读取」：
+
+        1. 提取标题大纲（编号 + 标题 + 字符数）发给模型；
+        2. 模型根据任务判断相关章节，按需请求读取（READ: 编号）；
+        3. 读取对应章节（父章节含子章节，避免跨段逻辑被切断）发送给模型；
+        4. 多轮交叉核对，直到模型输出 DONE 给出最终答案。
+
+        Returns:
+            Dict: 与 ask_markdown 单文件一致的 {"file","content","success","error"}
+        """
+        print("  检测到超大 Markdown（> 1MB），启用「大纲导航 + 按需读取」策略")
+        try:
+            markdown_content = md_file.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            try:
+                markdown_content = md_file.read_text(encoding="gbk")
+            except Exception as e:
+                return {"file": str(md_file), "success": False, "error": f"读取失败：{e}"}
+        except Exception as e:
+            return {"file": str(md_file), "success": False, "error": f"读取失败：{e}"}
+
+        outline_lines, sections, preamble = self._extract_outline(markdown_content)
+
+        # 无标题结构：退化为顺序切块
+        if not sections:
+            return self._ask_large_markdown_chunked(md_file, question, system_prompt, session_id, markdown_content)
+
+        outline_text = "\n".join(outline_lines)
+        print(f"  已提取大纲：{len(sections)} 个章节 + {('正文前内容' if preamble.strip() else '无')}")
+
+        instructions = (
+            "这是一个超长 Markdown 文档，为避免超出上下文限制，采用「大纲导航 + 按需读取」方式处理。\n"
+            "下面给出文档大纲（[编号] 标题（字符数））。请先根据任务需求，判断哪些章节可能包含相关信息，再按需请求读取。\n\n"
+            "回复格式（严格遵守，请勿输出多余内容）：\n"
+            "- 需要读取某些章节时，只输出一行：READ: 1.2,3,0\n"
+            "- 已获取足够信息、可以给出最终答案时，先输出单独一行：DONE\n"
+            "  然后在其后各行给出完整回答。\n"
+            "注意：不要在 READ 阶段输出最终答案，也不要编造未读取章节的内容；"
+            "信息可能散落在多个章节，请逐一读取后交叉汇总。\n\n"
+            "=== 文档大纲 ===\n"
+            f"{outline_text}\n"
+            "=== 大纲结束 ===\n"
+        )
+
+        conversation = []
+        if system_prompt:
+            conversation.append({"role": "system", "content": system_prompt})
+        conversation.append({
+            "role": "user",
+            "content": [
+                {"type": "text", "text": instructions + "\n<question>\n"},
+                *question,
+                {"type": "text", "text": "\n</question>"},
+            ],
+        })
+
+        sent_sections = set()
+        final_result = None
+        result = None
+
+        for round_no in range(1, MAX_OUTLINE_ROUNDS + 1):
+            print(f"  [大纲导航] 第 {round_no}/{MAX_OUTLINE_ROUNDS} 轮")
+            result = self._post_chat(conversation, workspace=str(md_file.parent), session_id=session_id)
+            if not result["success"]:
+                result["file"] = str(md_file)
+                return result
+
+            action, requested, answer = self._parse_navigation_response(result["content"])
+
+            if action == "read" and requested:
+                new_sections = [s for s in requested if s not in sent_sections]
+                if not new_sections:
+                    print("  ! 模型未请求新章节，转为请求最终答案")
+                    conversation.append({"role": "assistant", "content": [{"type": "text", "text": result["content"]}]})
+                    conversation.append({"role": "user", "content": [{"type": "text", "text": "请直接基于已读取的内容给出最终完整答案。"}]})
+                    result = self._post_chat(conversation, workspace=str(md_file.parent), session_id=session_id)
+                    final_result = result
+                    break
+
+                payload = self._build_section_payload(sections, preamble, new_sections, sent_sections, md_file.parent)
+                if not payload:
+                    print("  ! 请求的章节不可读，转为请求最终答案")
+                    conversation.append({"role": "assistant", "content": [{"type": "text", "text": result["content"]}]})
+                    conversation.append({"role": "user", "content": [{"type": "text", "text": "你请求的章节不存在或为空，请基于已读取的内容给出最终完整答案。"}]})
+                    result = self._post_chat(conversation, workspace=str(md_file.parent), session_id=session_id)
+                    final_result = result
+                    break
+
+                print(f"  读取章节：{', '.join(new_sections)}")
+                conversation.append({"role": "assistant", "content": [{"type": "text", "text": result["content"]}]})
+                conversation.append({
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": f"已读取以下章节内容（{', '.join(new_sections)}）：\n"},
+                        *payload,
+                        {"type": "text", "text": "\n\n请基于以上内容继续：若还需其他章节，回复 READ: 编号；否则回复 DONE 并给出最终答案。"},
+                    ],
+                })
+            else:
+                if action == "done" and answer:
+                    result["content"] = answer
+                final_result = result
+                break
+
+        if final_result is None:
+            # 达到最大轮数仍未给出最终答案：要求模型基于已读内容作答
+            print(f"  ! 已达最大轮数（{MAX_OUTLINE_ROUNDS}），请求基于已读内容给出最终答案")
+            conversation.append({
+                "role": "user",
+                "content": [{"type": "text", "text": "已达到最大读取轮数，请基于已读取的内容给出最终完整答案。"}],
+            })
+            result = self._post_chat(conversation, workspace=str(md_file.parent), session_id=session_id)
+            final_result = result
+
+        final_result["file"] = str(md_file)
+        return final_result
+
     def ask_markdown(self,
             prompt: List[Dict],
             system_prompt: List[Dict],
@@ -538,6 +924,21 @@ class QwenPawRemoteClient:
         for i, md_file in enumerate(md_files, 1):
             print(f"\n[{i}/{len(md_files)}] 发送：{md_file.name}")
             print("-" * 70)
+
+            # 超长 Markdown（> 1MB）：改用「大纲导航 + 按需读取」，避免一次性塞入上下文
+            try:
+                file_size = md_file.stat().st_size
+            except OSError:
+                file_size = 0
+            if file_size > LARGE_MD_SIZE_THRESHOLD:
+                result = self._ask_large_markdown(md_file, prompt, system_prompt, session_id)
+                results.append(result)
+                last_result = result
+                if result.get("success"):
+                    print("  发送成功")
+                else:
+                    print(f"  x 发送失败：{result.get('error')}")
+                continue
 
             # 读取 markdown 内容
             try:

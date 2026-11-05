@@ -1,7 +1,7 @@
 import os
 import uuid
 import torch
-from typing import Tuple, Dict, Union, Literal, Any
+from typing import Tuple, List, Dict, Union, Literal, Any
 from pathlib import Path
 import contextlib
 import json
@@ -118,7 +118,7 @@ def _smiles_to_molfile(smiles: str) -> str:
 def get_molparser_prediction(
     path: Union[str, Path],
     data_type: Literal["smiles", "molfile", "both"] = "smiles",
-) -> Union[Tuple[str, str], Tuple[str, str, str]]:
+) -> Union[Tuple[str, List[str]], Tuple[str, List[str], List[str]]]:
     """
     Get predictions from the MolParser model for a given image path.
 
@@ -131,9 +131,9 @@ def get_molparser_prediction(
 
     Returns:
         If data_type is "smiles" or "molfile":
-            A tuple containing (image_name, result_string)
+            A tuple containing (image_name, result_list)
         If data_type is "both":
-            A tuple containing (image_name, smiles_string, molfile_string)
+            A tuple containing (image_name, smiles_list, molfile_list)
 
     Raises:
         FileNotFoundError: If the specified path does not exist.
@@ -152,16 +152,18 @@ def get_molparser_prediction(
     # Use the singleton MolParser instance to get predictions
     parser = init_molparser()
     try:
-        results = parser.parse_image(str(path), rec_only=True)
+        results = parser.parse_image(str(path), rec_only=False)
     except Exception as e:
         raise RuntimeError(f"Error in MolParser prediction: {str(e)}")
 
-    smiles = results[0].smi if results else ""
+    smiles = [result.smi for result in results]
 
     # MolParser outputs SMILES only; derive a molfile with 2D coordinates
+    # for each detected molecule.
     get_molfile = data_type in ("molfile", "both")
-    molfile = _smiles_to_molfile(smiles) if get_molfile else ""
-
+    molfile = []
+    if get_molfile:
+        molfile = [_smiles_to_molfile(smi) for smi in smiles]
     # Return results based on data_type
     if data_type == "smiles":
         return image_name, smiles
@@ -265,7 +267,7 @@ def process_chemical_structure(
             return {
                 "image_name": result['image_name'],
                 "smiles": result['smiles'],
-                "molfile": result['graph'],
+                "molfile": [result['graph']] if result.get('graph') else [],
                 "engine": engine,
                 "hardware": 'cpu',
             }

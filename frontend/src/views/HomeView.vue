@@ -179,7 +179,7 @@
                   <div class="structure-details">
                     <div class="smiles-section">
                       <h4 class="details-title">SMILES</h4>
-                      <div class="smiles-code">{{ submitData.structureData.smiles }}</div>
+                      <div class="smiles-code">{{ formatSmiles(submitData.structureData.smiles) }}</div>
                     </div>
                     <div class="details-row">
                       <span class="detail-label">Engine:</span>
@@ -383,6 +383,7 @@ import coconutService from '@/services/coconutService' // Import the new COCONUT
 import CoconutLoginModal from '@/components/coconut/CoconutLoginModal.vue' // Import the COCONUT login modal component
 
 import { mapState, mapActions } from 'vuex'
+import { primary, joinValue } from '@/utils/structure'
 
 export default {
   name: 'HomeView',
@@ -519,6 +520,11 @@ export default {
       fetchAnnotations: 'annotations/fetchAnnotations',
       processSegments: 'structures/processSegments'
     }),
+
+    // Normalize a smiles value (string or array) for display
+    formatSmiles(value) {
+      return joinValue(value, '\n')
+    },
     
     // Debounce function to prevent too many resize calls
     debounce(fn, wait) {
@@ -998,9 +1004,9 @@ export default {
   // Generate SVG depiction for the structure
   try {
     const depictionOptions = {
-      smiles: structure.smiles,
-      molfile: structure.molfile,
-      useMolfileDirectly: !!structure.molfile && structure.engine === 'molparser',
+      smiles: primary(structure.smiles),
+      molfile: primary(structure.molfile),
+      useMolfileDirectly: !!primary(structure.molfile) && structure.engine === 'molparser',
       format: 'svg',
       width: 300,
       height: 300
@@ -1032,8 +1038,8 @@ export default {
     // Immediately perform PubChem search for this structure
     try {
       console.log('Performing PubChem search for selected structure');
-      if (structure.smiles) {
-        pubchemData = await publicationService.searchPubChemBySmiles(structure.smiles);
+      if (primary(structure.smiles)) {
+        pubchemData = await publicationService.searchPubChemBySmiles(primary(structure.smiles));
         if (pubchemData) {
           console.log('Successfully found PubChem data:', pubchemData);
           this.submitData.structureData.pubchemData = pubchemData;

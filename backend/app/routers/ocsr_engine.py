@@ -117,13 +117,6 @@ def find_image_path(image_path: str) -> str:
                 if segment_name in files:
                     return os.path.join(root, segment_name)
 
-    # If we reached here, try a global search as a fallback, but with a warning
-    for root, dirs, files in os.walk(SEGMENTS_DIR):
-        basename = os.path.basename(image_path)
-        if basename in files:
-            print(f"WARNING: Found image {basename} in {root} via fallback search")
-            return os.path.join(root, basename)
-
     # Image not found
     raise FileNotFoundError(f"Image file not found: {image_path}")
 
@@ -553,9 +546,12 @@ async def generate_with_depiction(
             hand_drawn=hand_drawn,
         )
 
-        # Extract SMILES and molfile from the result
-        smiles = ocsr_result.get("smiles", "")
-        molfile = ocsr_result.get("molfile", "")
+        # Extract SMILES and molfile from the result (both are now lists;
+        # take the first structure for depiction).
+        smiles_list = ocsr_result.get("smiles", []) or []
+        molfile_list = ocsr_result.get("molfile", []) or []
+        smiles = smiles_list[0] if smiles_list else ""
+        molfile = molfile_list[0] if molfile_list else ""
 
         if engine=='molecode' and molfile:
             depict_engine = 'mermaid'

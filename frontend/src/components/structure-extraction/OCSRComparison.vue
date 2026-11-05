@@ -52,7 +52,7 @@
                 </div>
                 <div class="detail-row">
                   <span class="detail-label">SMILES Length:</span>
-                  <span class="detail-value">{{ result.smiles ? result.smiles.length : 'N/A' }}</span>
+                  <span class="detail-value">{{ primarySmiles(result) ? primarySmiles(result).length : 'N/A' }}</span>
                 </div>
                 <div class="detail-row">
                   <span class="detail-label">Has Coordinates:</span>
@@ -132,6 +132,7 @@ import ImprovedChemicalStructureViewer from './ImprovedChemicalStructureViewer.v
 import ocsrService from '@/services/ocsrService';
 import depictionService from '@/services/depictionService';
 import similarityService from '@/services/similarityService';
+import { primary } from '@/utils/structure';
 
 export default {
   name: 'OCSRComparison',
@@ -192,7 +193,10 @@ export default {
       // Otherwise, use coordinates if:
       // 1. We have a molfile
       // 2. The global useCoordinatesForDepiction flag is true
-      return this.useCoordinatesForDepiction && !!result.molfile;
+      return this.useCoordinatesForDepiction && !!primary(result.molfile);
+    },
+    primarySmiles(result) {
+      return primary(result.smiles);
     },
     async findMCS() {
       if (this.findingMCS || !this.canFindMCS) return;

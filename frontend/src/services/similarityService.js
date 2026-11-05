@@ -1,4 +1,5 @@
 import api from './api'
+import { primary } from '@/utils/structure'
 
 /**
  * Service for interacting with the similarity comparison endpoints
@@ -23,9 +24,9 @@ const similarityService = {
       
       // Filter out empty SMILES (but keep track of indices)
       const filteredData = smilesList.map((smiles, index) => ({
-        smiles,
+        smiles: primary(smiles),
         engine: engineNames[index],
-        valid: !!smiles && smiles.trim() !== ''
+        valid: !!primary(smiles) && primary(smiles).trim() !== ''
       })).filter(item => item.valid);
       
       // If we have fewer than 2 valid SMILES, we can't do a comparison
@@ -43,8 +44,8 @@ const similarityService = {
             pair_agreements: {},
             invalid_smiles: smilesList.map((smiles, index) => ({
               engine: engineNames[index],
-              smiles: smiles || '',
-              valid: !!smiles && smiles.trim() !== ''
+              smiles: primary(smiles) || '',
+              valid: !!primary(smiles) && primary(smiles).trim() !== ''
             })).filter(item => !item.valid)
           }
         }
@@ -84,9 +85,9 @@ const similarityService = {
       
       // Filter out empty molfiles
       const filteredData = molfiles.map((molfile, index) => ({
-        molfile,
+        molfile: primary(molfile),
         engine: engineNames[index],
-        valid: !!molfile && molfile.trim() !== ''
+        valid: !!primary(molfile) && primary(molfile).trim() !== ''
       })).filter(item => item.valid);
       
       // If we have fewer than 2 valid molfiles, we can't find MCS

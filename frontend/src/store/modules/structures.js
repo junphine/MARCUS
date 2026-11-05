@@ -1,6 +1,7 @@
 import decimerService from "@/services/decimerService";
 import ocsrService from "@/services/ocsrService";
 import similarityService from "@/services/similarityService";
+import { primary } from "@/utils/structure";
 
 /**
  * Vuex module for handling chemical structure extraction and processing
@@ -244,34 +245,59 @@ export default {
 
           commit("SET_SEGMENTS_DIRECTORY", directory);
 
-          try {
-            // Get actual segment files instead of creating mock data
-            const segments = await decimerService.listSegmentFiles(directory);
-            console.log(`Fetched ${segments.length} segments from server`);
+          // Build segments directly from the extract_segments response's
+          // segments_info (no separate list_segments call needed).
+          const segmentsInfo = Array.isArray(response.segments_info)
+            ? response.segments_info
+            : [];
 
-            // Add PDF ID to each segment
-            const segmentsWithPdfId = segments.map((segment) => ({
-              ...segment,
-              pdfId: state.currentPdfId, // Add PDF ID to each segment
-            }));
+          const segments = segmentsInfo.map((info) => {
+            const pageIndex = info.pageNumber || 0;
+            const segmentNumber = info.segmentNumber || 0;
+            const filename = info.filename || "";
+            const segmentPath = info.path || `images/${filename}`;
 
-            // Set segments with PDF ID
-            commit("SET_SEGMENTS", segmentsWithPdfId);
+            // Reconstruct the full path relative to the segments directory,
+            // e.g. "<directory>/images/picture_1_segmented.png"
+            const fullPath = directory
+              ? `${directory}/${segmentPath}`.replace(/\/+/g, "/")
+              : segmentPath;
 
-            if (segments.length === 0 && response.segments_count > 0) {
-              console.warn(
-                "No segments returned from listSegmentFiles despite segments_count > 0"
-              );
-              commit(
-                "SET_ERROR",
-                "No segment files found despite successful extraction"
-              );
+            return {
+              id: `page-${pageIndex}-segment-${segmentNumber}`,
+              filename,
+              path: fullPath,
+              pageNumber: pageIndex + 1, // 1-based page number for display
+              segmentNumber,
+              pageIndex, // 0-based page index
+              bbox: info.bbox || null,
+              chemicalBboxes: info.chemical_bboxes || [],
+              pdfId: state.currentPdfId,
+            };
+          });
+
+          commit("SET_SEGMENTS", segments);
+
+          // Default-select segments that contain a chemical structure image
+          segments.forEach((segment) => {
+            if (
+              Array.isArray(segment.chemicalBboxes) &&
+              segment.chemicalBboxes.length > 0
+            ) {
+              commit("SET_SEGMENT_SELECTION", {
+                segmentId: segment.id,
+                selected: true,
+              });
             }
-          } catch (listError) {
-            console.error("Error listing segment files:", listError);
+          });
+
+          if (segments.length === 0 && response.segments_count > 0) {
+            console.warn(
+              "No segments found in segments_info despite segments_count > 0"
+            );
             commit(
               "SET_ERROR",
-              `Error listing segment files: ${listError.message}`
+              "No segment files found despite successful extraction"
             );
           }
 
@@ -584,7 +610,7 @@ export default {
         );
 
         if (structure && structure.smiles) {
-          smilesList.push(structure.smiles);
+          smilesList.push(primary(structure.smiles));
           engineNames.push(engine);
         }
       }
