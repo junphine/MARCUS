@@ -29,6 +29,11 @@
             </div>
           </div>
 
+          <div v-if="structure.smiles" class="structure-smiles">
+            <span class="smiles-label">SMILES:</span>
+            <span class="smiles-value">{{ structure.smiles }}</span>
+          </div>
+
           <div class="structure-item-footer">
             <span v-if="structures.length > 1" class="structure-index">{{ index + 1 }}</span>
             <div class="structure-actions">
@@ -176,6 +181,11 @@ export default {
   methods: {
     async generateDepictions() {
       const structures = this.structures
+
+      // Sequence token to guard against stale async results overwriting newer
+      // ones when the component is reused across segments (e.g. in a v-for).
+      const requestId = (this._depictionSeq = (this._depictionSeq || 0) + 1)
+
       if (!structures.length) {
         this.depictions = []
         this.isLoading = false
@@ -184,6 +194,9 @@ export default {
 
       this.isLoading = true
       this.depictionError = null
+      // Clear any previously-rendered depictions immediately so stale images
+      // from another structure are never shown while the new ones load.
+      this.depictions = []
 
       const isMolecode = this.sourceEngine === 'molecode'
 
@@ -197,25 +210,30 @@ export default {
           structures.map((structure) => this.generateOne(structure, isMolecode))
         )
 
+        if (requestId !== this._depictionSeq) return
+
         this.depictions = results
         this.depictionFormat = 'svg'
         this.initialized = true
 
         console.log(`[Depiction] Successfully generated ${results.length} depiction(s) for ${this.name || 'structure'}`);
       } catch (error) {
+        if (requestId !== this._depictionSeq) return
+
         console.error(`[Depiction] Error generating depiction for ${this.sourceEngine}:`, error)
         this.depictionError = error.message || 'Failed to generate depiction'
         this.depictions = []
 
         this.$emit('error', this.depictionError)
       } finally {
-        this.isLoading = false
-
-        this.$emit('depiction-complete', {
-          engine: this.sourceEngine,
-          success: !this.depictionError,
-          error: this.depictionError
-        });
+        if (requestId === this._depictionSeq) {
+            this.isLoading = false;
+            this.$emit('depiction-complete', {
+              engine: this.sourceEngine,
+              success: !this.depictionError,
+              error: this.depictionError
+            });
+        }
       }
     },
     async generateOne(structure, isMolecode) {
@@ -466,6 +484,27 @@ export default {
             max-width: 90%;
             word-break: break-all;
           }
+        }
+      }
+
+      .structure-smiles {
+        display: flex;
+        align-items: baseline;
+        gap: 0.5rem;
+        padding: 0.5rem 0.25rem 0;
+        font-size: 0.8125rem;
+
+        .smiles-label {
+          flex-shrink: 0;
+          font-weight: 600;
+          color: var(--color-text);
+        }
+
+        .smiles-value {
+          font-family: monospace;
+          color: var(--color-text-light);
+          word-break: break-all;
+          overflow-wrap: anywhere;
         }
       }
 

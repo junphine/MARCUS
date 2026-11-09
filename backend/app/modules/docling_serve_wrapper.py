@@ -338,7 +338,7 @@ def extract_picture_segments_from_pdf(
         )
 
         # Strip the references section (parity with the local wrapper).
-        _remove_reference_section(doc)
+        #_remove_reference_section(doc)
 
         pictures = doc.get("pictures") if isinstance(doc.get("pictures"), list) else []
         picture_counter = 0
@@ -501,7 +501,7 @@ def generate_basic_metadata(
                         "filename": segment_file,
                         "path": "images/"+segment_file,
                         "pageNumber": 0,
-                        "segmentNumber": idx + 1,
+                        "segmentNumber": idx,
                         "bbox": [0, 0, 1000, 1000],
                         "chemical_bboxes": contains_chems,
                     }

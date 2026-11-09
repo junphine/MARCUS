@@ -165,15 +165,6 @@
               </div>
             </div>
 
-            <div class="smiles-container">
-              <div class="smiles-header">
-                <span class="smiles-label">SMILES:</span>
-              </div>
-              <div class="smiles-content">
-                <div class="smiles-box">{{ displayedSmiles }}</div>
-              </div>
-            </div>
-
             <div class="tags-row">
               <div class="tag smiles-tag">
                 <vue-feather type="code" size="14" class="tag-icon"></vue-feather>
@@ -624,9 +615,6 @@ export default {
     displayedStructure() {
       // Use the local edited structure if available, otherwise use the prop
       return this.currentStructure || this.processedStructure || null;
-    },
-    displayedSmiles() {
-      return joinValue(this.displayedStructure?.smiles);
     },
     hasStructure() {
       return !!this.displayedStructure;
@@ -2558,126 +2546,6 @@ export default {
                     .error-message {
                       font-weight: 500;
                       font-size: 0.875rem;
-                    }
-                  }
-                }
-              }
-            }
-
-            .smiles-container {
-              padding: 1.75rem 1.5rem;
-              border-top: 1px solid rgba(226, 232, 240, 0.7);
-              position: relative;
-              background: linear-gradient(120deg, rgba(248, 250, 252, 0.8), rgba(255, 255, 255, 0.95));
-              overflow: hidden;
-
-              /* Enhanced top border accent */
-              &::before {
-                content: "";
-                position: absolute;
-                top: -2px;
-                left: 0;
-                right: 0;
-                height: 3px;
-                background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 50%, #06b6d4 100%);
-                opacity: 0.8;
-                border-radius: 0 0 2px 2px;
-              }
-
-              .smiles-header {
-                margin-bottom: 1rem;
-                display: flex;
-                align-items: center;
-
-                .smiles-label {
-                  font-weight: 700;
-                  color: #1e293b;
-                  font-size: 1rem;
-                  display: flex;
-                  align-items: center;
-                  gap: 0.625rem;
-                  letter-spacing: -0.01em;
-
-                  &::before {
-                    content: "";
-                    display: block;
-                    width: 14px;
-                    height: 14px;
-                    border-radius: 50%;
-                    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-                    box-shadow: 0 0 12px rgba(59, 130, 246, 0.6), 0 2px 4px rgba(59, 130, 246, 0.3);
-                    animation: subtle-pulse 3s ease-in-out infinite;
-                  }
-                }
-              }
-
-              .smiles-content {
-                .smiles-box {
-                  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
-                  background: rgba(255, 255, 255, 0.95);
-                  padding: 1.5rem;
-                  border-radius: 14px;
-                  font-size: 0.9375rem;
-                  color: #1e293b;
-                  overflow-x: auto;
-                  white-space: pre-wrap;
-                  word-break: break-all;
-                  border: 1px solid rgba(226, 232, 240, 0.8);
-                  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.9);
-                  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-                  position: relative;
-                  backdrop-filter: blur(8px);
-                  line-height: 1.6;
-
-                  &:hover {
-                    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.9);
-                    border-color: rgba(59, 130, 246, 0.4);
-                    transform: translateY(-2px);
-                    background: white;
-                  }
-
-                  /* Enhanced copy button */
-                  &::after {
-                    content: "📋 Copy";
-                    position: absolute;
-                    top: 0.75rem;
-                    right: 0.75rem;
-                    background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(59, 130, 246, 0.15) 100%);
-                    color: #3b82f6;
-                    font-size: 0.75rem;
-                    padding: 0.375rem 0.625rem;
-                    border-radius: 8px;
-                    opacity: 0;
-                    transition: all 0.3s ease;
-                    cursor: pointer;
-                    font-family: system-ui, sans-serif;
-                    font-weight: 600;
-                    border: 1px solid rgba(59, 130, 246, 0.2);
-                    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.1);
-                    backdrop-filter: blur(4px);
-                  }
-
-                  &:hover::after {
-                    opacity: 1;
-                    transform: translateY(-1px) scale(1.02);
-                  }
-
-                  /* Scrollbar styling */
-                  &::-webkit-scrollbar {
-                    height: 6px;
-                  }
-
-                  &::-webkit-scrollbar-track {
-                    background: rgba(241, 245, 249, 0.6);
-                    border-radius: 3px;
-                  }
-
-                  &::-webkit-scrollbar-thumb {
-                    background: rgba(148, 163, 184, 0.4);
-                    border-radius: 3px;
-
-                    &:hover {
-                      background: rgba(100, 116, 139, 0.6);
                     }
                   }
                 }

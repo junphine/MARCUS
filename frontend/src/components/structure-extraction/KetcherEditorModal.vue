@@ -1,26 +1,28 @@
 <template>
-  <div v-if="visible" class="ketcher-modal-overlay">
-    <div class="ketcher-modal">
-      <div class="modal-header">
-        <h3>Edit Structure</h3>
-        <button class="close-btn" @click="$emit('close')">
-          <span>&times;</span>
-        </button>
-      </div>
-      <div class="modal-body">
-        <iframe
-          ref="ketcherFrame"
-          :src="ketcherUrl"
-          class="ketcher-iframe"
-          @load="onKetcherLoad"
-        ></iframe>
-      </div>
-      <div class="modal-footer">
-        <button class="apply-btn" @click="applyEdits">Apply</button>
-        <button class="cancel-btn" @click="$emit('close')">Cancel</button>
+  <Teleport to="body">
+    <div v-if="visible" class="ketcher-modal-overlay">
+      <div class="ketcher-modal">
+        <div class="modal-header">
+          <h3>Edit Structure</h3>
+          <button class="close-btn" @click="$emit('close')">
+            <span>&times;</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <iframe
+            ref="ketcherFrame"
+            :src="ketcherUrl"
+            class="ketcher-iframe"
+            @load="onKetcherLoad"
+          ></iframe>
+        </div>
+        <div class="modal-footer">
+          <button class="apply-btn" @click="applyEdits">Apply</button>
+          <button class="cancel-btn" @click="$emit('close')">Cancel</button>
+        </div>
       </div>
     </div>
-  </div>
+  </Teleport>
 </template>
 
 <script>
@@ -179,18 +181,15 @@ export default {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
   background: rgba(0,0,0,0.35);
-  z-index: 1000;
+  z-index: 3000;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 .ketcher-modal {
   background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
-  width: 800px;
-  max-width: 98vw;
-  max-height: 90vh;
+  width: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
 }
@@ -212,10 +211,12 @@ export default {
   flex: 1;
   padding: 0;
   overflow: hidden;
+  min-height: 0;
 }
 .ketcher-iframe {
+  display: block;
   width: 100%;
-  height: 480px;
+  height: 100%;
   border: none;
   background: #f8fafc;
 }

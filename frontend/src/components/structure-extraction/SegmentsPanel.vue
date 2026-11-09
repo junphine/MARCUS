@@ -123,7 +123,7 @@
               </h4>
 
               <!-- Use our improved depiction component for visualization -->
-              <ImprovedChemicalStructureViewer :smiles="getStructureSmiles(segment)"
+              <ImprovedChemicalStructureViewer :key="segment.id" :smiles="getStructureSmiles(segment)"
                 :molfile="getStructureMolfile(segment)" :name="getStructureName(segment)"
                 :source-engine="getStructureEngine(segment)" :use-coordinates="shouldUseCoordinates(segment)" />
             </div>
